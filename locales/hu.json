@@ -1,0 +1,24 @@
+{
+    "window_title": "VanDoor Dokumentum Kezelő",
+    "documents": "Dokumentumok",
+    "new_element": "Új elem",
+    "move_up": "Fel",
+    "new_subpage": "Új aloldal",
+    "move_down": "Le",
+    "path": "Útvonal",
+    "subpages": "Aloldalak",
+    "elements": "Elemek",
+    "element_name": "Név",
+    "element_type": "Típus",
+    "element_content": "Tartalom",
+    "element_types": {
+        "TITLE": "Cím",
+        "TEXT": "Szöveg",
+        "PATH": "Útvonal",
+        "PAGE": "Oldal",
+        "LINK": "Hivatkozás"
+    },
+    "save_bookmark": "Könyvjelző mentése",
+    "load_bookmark": "Könyvjelző betöltése",
+    "bookmark_label": "Könyvjelző"
+}

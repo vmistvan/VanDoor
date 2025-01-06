@@ -1,0 +1,18 @@
+{
+    "current_language": "hu",
+    "next_oid": -1,
+    "bookmark": {
+        "page": "20",
+        "title": "VanDoor Page 20"
+    },
+    "window": {
+        "x": 100,
+        "y": 100,
+        "width": 1200,
+        "height": 800,
+        "is_maximized": false
+    },
+    "ui_state": {
+        "selected_element_type": "TEXT"
+    }
+}

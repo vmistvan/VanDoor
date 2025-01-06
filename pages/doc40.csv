@@ -1,0 +1,6 @@
+oid,name,content,type,status,pid,position
+"40","MAIN TITLE","VanDoor Page40","TITLE","PUBLIC",1,1
+"41","MAIN TEXT","VanDoor Dokumentum Kezelő, első próba sor","TEXT","PUBLIC",1,2
+"42","MAIN TEXT","VanDoor Doku Kezelő, második próba sor; ez hosszabb, második próba sor.","TEXT","PUBLIC",1,3
+"43","PATH1","1#>VanDoor Dokumentum Kezelő","PATH","PUBLIC",1,4
+"44","PATH40","40#>VanDoor Page40","PATH","PUBLIC",1,5

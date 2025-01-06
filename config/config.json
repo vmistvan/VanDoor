@@ -1,0 +1,55 @@
+{
+    "default_language": "hu",
+    "oid_sequence_starts": 200,
+    "available_languages": ["hu", "en"],
+    "element_types": [
+        {
+            "key": "TITLE",
+            "can_move": true,
+            "max_per_document": 1
+        },
+        {
+            "key": "TEXT",
+            "can_move": true,
+            "max_per_document": null
+        },
+        {
+            "key": "PATH",
+            "can_move": false,
+            "max_per_document": 1
+        },
+        {
+            "key": "PAGE",
+            "can_move": true,
+            "max_per_document": null
+        },
+        {
+            "key": "LINK",
+            "can_move": true,
+            "max_per_document": null
+        }
+    ],
+    "ui": {
+        "window": {
+            "default_width": 1200,
+            "default_height": 800,
+            "min_width": 800,
+            "min_height": 600
+        },
+        "panels": {
+            "top_panel_max_height_percent": 20,
+            "top_panel_min_height": 100,
+            "left_panel_width_ratio": 1,
+            "right_panel_width_ratio": 2
+        },
+        "table": {
+            "content_column_width_percent": 80,
+            "buttons_column_width_percent": 15
+        }
+    },
+    "paths": {
+        "documents_dir": "pages",
+        "locales_dir": "locales",
+        "state_file": "config/state.json"
+    }
+}

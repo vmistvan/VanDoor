@@ -1,0 +1,24 @@
+{
+    "window_title": "VanDoor Document Manager",
+    "documents": "Documents",
+    "new_element": "New Element",
+    "move_up": "Move Up",
+    "move_down": "Move Down",
+    "path": "Path",
+    "subpages": "Subpages",
+    "elements": "Elements",
+    "element_name": "Name",
+    "element_type": "Type",
+    "element_content": "Content",
+    "element_types": {
+        "TITLE": "Title",
+        "TEXT": "Text",
+        "PATH": "Path",
+        "PAGE": "Page",
+        "LINK": "Link"
+    },
+    "new_subpage": "New Subpage",
+    "save_bookmark": "Save Bookmark",
+    "load_bookmark": "Load Bookmark",
+    "bookmark_label": "Bookmark"
+}
