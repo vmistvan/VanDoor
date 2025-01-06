@@ -4,7 +4,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QTreeWidget, QTreeWidgetItem, QTextEdit, 
                             QPushButton, QLabel, QComboBox, QSizePolicy, QTableWidget,
-                            QTableWidgetItem, QHeaderView, QScrollArea, QGroupBox, QFrame)
+                            QTableWidgetItem, QHeaderView, QScrollArea, QGroupBox, QFrame,
+                            QDialog, QLineEdit, QSpinBox, QFileDialog, QStackedWidget,
+                            QListWidget, QListWidgetItem)
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from document_manager import DocumentManager
 from translations import Translator
@@ -22,6 +24,160 @@ class ClickableLabel(QLabel):
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.clicked.emit(self.content)
+
+class ElementEditorDialog(QDialog):
+    def __init__(self, parent, translator, doc_manager, mode="NEW", position=0):
+        super().__init__(parent)
+        self.translator = translator
+        self.doc_manager = doc_manager
+        self.parent = parent
+        self.mode = mode
+        self.position = position
+        self.selected_type = None
+        self.field_widgets = {}
+        self.init_ui()
+        
+    def init_ui(self):
+        """Dialog felületének inicializálása"""
+        # Ablak beállítások
+        self.setWindowTitle(self.translator.get_text('add_element_title'))
+        self.setModal(True)
+        
+        # Fő layout
+        main_layout = QVBoxLayout(self)
+        
+        # Stack widget a lépésekhez
+        self.stack = QStackedWidget()
+        
+        # Első oldal: típus választó
+        type_page = QWidget()
+        type_layout = QVBoxLayout(type_page)
+        
+        # Típus lista
+        self.type_list = QListWidget()
+        for type_id, geometry in DocumentManager.get_type_geometries().items():
+            item = QListWidgetItem(self.translator.get_text(f'element_types.{type_id}'))
+            item.setData(Qt.UserRole, geometry)
+            self.type_list.addItem(item)
+        type_layout.addWidget(self.type_list)
+        
+        # Gombok az első oldalhoz
+        type_buttons = QHBoxLayout()
+        self.next_button = QPushButton(self.translator.get_text('next'))
+        cancel_button = QPushButton(self.translator.get_text('cancel'))
+        type_buttons.addWidget(cancel_button)
+        type_buttons.addWidget(self.next_button)
+        type_layout.addLayout(type_buttons)
+        
+        # Második oldal: tartalom szerkesztő
+        content_page = QWidget()
+        content_layout = QVBoxLayout(content_page)
+        
+        # Tartalom mezők
+        self.content_fields = QWidget()
+        self.content_fields_layout = QVBoxLayout(self.content_fields)
+        content_layout.addWidget(self.content_fields)
+        
+        # Gombok a második oldalhoz
+        content_buttons = QHBoxLayout()
+        back_button = QPushButton(self.translator.get_text('back'))
+        add_button = QPushButton(self.translator.get_text('add'))
+        cancel_button2 = QPushButton(self.translator.get_text('cancel'))
+        content_buttons.addWidget(cancel_button2)
+        content_buttons.addWidget(back_button)
+        content_buttons.addWidget(add_button)
+        content_layout.addLayout(content_buttons)
+        
+        # Oldalak hozzáadása a stack-hez
+        type_page.setLayout(type_layout)
+        content_page.setLayout(content_layout)
+        self.stack.addWidget(type_page)
+        self.stack.addWidget(content_page)
+        main_layout.addWidget(self.stack)
+        
+        # Események
+        cancel_button.clicked.connect(self.reject)
+        cancel_button2.clicked.connect(self.reject)
+        self.next_button.clicked.connect(self.show_content_page)
+        back_button.clicked.connect(lambda: self.stack.setCurrentIndex(0))
+        add_button.clicked.connect(self.add_element)
+        
+        # Méret beállítása
+        self.resize(400, 500)
+        
+    def show_content_page(self):
+        """Második oldal megjelenítése"""
+        if not self.type_list.currentItem():
+            return
+            
+        # Kiválasztott típus mentése
+        self.selected_type = self.type_list.currentItem().data(Qt.UserRole)
+        
+        # Tartalom mezők törlése
+        for i in reversed(range(self.content_fields_layout.count())): 
+            self.content_fields_layout.itemAt(i).widget().setParent(None)
+        
+        # Slot-ok feldolgozása
+        slot_ids = self.selected_type.slot_ids.split("#>")
+        slot_names = self.selected_type.slot_names.split("#>")
+        slot_types = self.selected_type.slot_types.split("#>")
+        
+        # Mezők létrehozása
+        self.field_widgets = {}
+        for slot_id, slot_name, slot_type in zip(slot_ids, slot_names, slot_types):
+            if slot_type == "HIDDEN":
+                continue
+                
+            # Címke
+            label = QLabel(slot_name)
+            self.content_fields_layout.addWidget(label)
+            
+            # Beviteli mező típus szerint
+            if slot_type == "TEXT":
+                field = QLineEdit()
+            elif slot_type == "FILE":
+                field = QPushButton(self.translator.get_text('file_upload'))
+                field.clicked.connect(lambda s=slot_id: self.select_file(s))
+            elif slot_type == "INTEGER":
+                field = QSpinBox()
+            
+            self.field_widgets[slot_id] = field
+            self.content_fields_layout.addWidget(field)
+        
+        # Váltás a második oldalra
+        self.stack.setCurrentIndex(1)
+        
+    def select_file(self, slot_id):
+        """Fájl kiválasztása"""
+        file_name, _ = QFileDialog.getOpenFileName(self)
+        if file_name:
+            self.field_widgets[slot_id].setText(file_name)
+            
+    def add_element(self):
+        """Elem hozzáadása"""
+        if not self.selected_type:
+            return
+            
+        # Értékek összegyűjtése
+        values = {}
+        for slot_id, widget in self.field_widgets.items():
+            if isinstance(widget, QLineEdit):
+                values[slot_id] = widget.text()
+            elif isinstance(widget, QPushButton):  # FILE típus
+                values[slot_id] = widget.text()
+            elif isinstance(widget, QSpinBox):
+                values[slot_id] = str(widget.value())
+        
+        # TODO: Elem létrehozása és hozzáadása
+        self.close()
+        
+    def showEvent(self, event):
+        """Megjelenéskor középre pozicionálás"""
+        parent_rect = self.parent.rect()
+        self.move(
+            self.parent.mapToGlobal(parent_rect.center()) - 
+            self.rect().center()
+        )
 
 class VanDoorMainWindow(QMainWindow):
     def __init__(self):
@@ -305,7 +461,11 @@ class VanDoorMainWindow(QMainWindow):
 
     def handle_new_button_click(self, position, row):
         """Új elem gomb kezelése"""
-        self.add_new_element(row)
+        # Elem szerkesztő megjelenítése
+        if hasattr(self, 'element_editor') and self.element_editor:
+            self.element_editor.close()
+        self.element_editor = ElementEditorDialog(self, self.translator, self.doc_manager, mode="NEW", position=position)
+        self.element_editor.show()
         self.temporarily_disable_position(position, 'new')
 
     def handle_down_button_click(self, position):

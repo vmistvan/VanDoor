@@ -20,5 +20,12 @@
     },
     "save_bookmark": "Könyvjelző mentése",
     "load_bookmark": "Könyvjelző betöltése",
-    "bookmark_label": "Könyvjelző"
+    "bookmark_label": "Könyvjelző",
+    "add_element_title": "Új elem hozzáadása",
+    "next": "Tovább",
+    "cancel": "Mégse",
+    "back": "Visszalépés",
+    "add": "Hozzáadás",
+    "select_type": "Válassza ki az elem típusát",
+    "file_upload": "Fájl feltöltése"
 }

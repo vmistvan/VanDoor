@@ -20,5 +20,12 @@
     "new_subpage": "New Subpage",
     "save_bookmark": "Save Bookmark",
     "load_bookmark": "Load Bookmark",
-    "bookmark_label": "Bookmark"
+    "bookmark_label": "Bookmark",
+    "add_element_title": "Add New Element",
+    "next": "Next",
+    "cancel": "Cancel",
+    "back": "Back",
+    "add": "Add",
+    "select_type": "Select Element Type",
+    "file_upload": "Upload File"
 }

@@ -11,7 +11,37 @@ class DocumentManager:
         :return: Megjelenítési információkat tartalmazó szótár
         """
         # Alapértelmezett típusgeometriák
-        type_geometries = {
+        type_geometries = DocumentManager.get_type_geometries()
+        
+        # Elem típusgeometriájának kikeresése
+        type_geometry = type_geometries.get(element.type, element.type_geometry)
+        
+        return {
+            'oid': element.oid,
+            'name': element.name,
+            'content': element.content,
+            'type': element.type.name if element.type else None,  
+            'status': element.status.name if element.status else None,  
+            'pid': element.pid,
+            'position': element.position,
+            'geometry': {
+                'type_id': type_geometry.type_id,
+                'wrap': type_geometry.wrap,
+                'slot_ids': type_geometry.slot_ids,
+                'slot_names': type_geometry.slot_names,
+                'slot_types': type_geometry.slot_types,
+                'slot_defaults': type_geometry.slot_defaults
+            } if type_geometry else None
+        }
+
+    @staticmethod
+    def get_type_geometries():
+        """
+        Visszaadja az összes típusgeometriát
+        
+        :return: Típusgeometriák szótára, ahol a kulcs a DocumentElementType
+        """
+        return {
             DocumentElementType.TITLE: TypeGeometry(
                 type_id="TITLE",
                 wrap="<H1>#></H1>",
@@ -100,28 +130,6 @@ class DocumentManager:
                 slot_types="HIDDEN#>HIDDEN",
                 slot_defaults=""
             )
-            
-        }
-        
-        # Elem típusgeometriájának kikeresése
-        type_geometry = type_geometries.get(element.type, element.type_geometry)
-        
-        return {
-            'oid': element.oid,
-            'name': element.name,
-            'content': element.content,
-            'type': element.type.name if element.type else None,  
-            'status': element.status.name if element.status else None,  
-            'pid': element.pid,
-            'position': element.position,
-            'geometry': {
-                'type_id': type_geometry.type_id,
-                'wrap': type_geometry.wrap,
-                'slot_ids': type_geometry.slot_ids,
-                'slot_names': type_geometry.slot_names,
-                'slot_types': type_geometry.slot_types,
-                'slot_defaults': type_geometry.slot_defaults
-            } if type_geometry else None
         }
 
     @staticmethod
