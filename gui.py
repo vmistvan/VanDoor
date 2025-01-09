@@ -44,19 +44,37 @@ class ElementEditorDialog(QDialog):
         
         # Dialog beállítások
         self.setWindowTitle(self.parent.config_manager.get_translation('add_element_title'))
-        self.setMinimumWidth(400)
+        
+        # Ablak méretének beállítása a szülő ablak 80%-ára
+        parent_rect = self.parent.rect()
+        dialog_width = int(parent_rect.width() * 0.8)
+        dialog_height = int(parent_rect.height() * 0.8)
+        self.resize(dialog_width, dialog_height)
+        
+        # Központi pozicionálás
+        self.move(
+            self.parent.mapToGlobal(parent_rect.center()) - 
+            self.rect().center()
+        )
+        
         self.setModal(True)
         
         # Layout beállítások
         layout = QVBoxLayout()
         self.setLayout(layout)
         
-        # Típus választó lista
-        type_label = QLabel(self.parent.config_manager.get_translation('choose_element_type'))
-        layout.addWidget(type_label)
+        # Típus választó konténer
+        type_container = QHBoxLayout()
+        type_container.setAlignment(Qt.AlignRight)
         
+        # Típus választó címke
+        type_label = QLabel(self.parent.config_manager.get_translation('choose_element_type'))
+        type_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+        type_container.addWidget(type_label, alignment=Qt.AlignLeft)
+        
+        # Típus lista
         self.type_list = QListWidget()
-        layout.addWidget(self.type_list)
+        self.type_list.setSizeAdjustPolicy(QListWidget.AdjustToContents)
         
         # Típusok hozzáadása a listához
         for type_name in DocumentElementType.__members__:
@@ -67,11 +85,22 @@ class ElementEditorDialog(QDialog):
                 item.setData(Qt.UserRole, translated_name)  # Tároljuk a fordítást
                 self.type_list.addItem(item)
         
+        # Lista méretének beállítása a tartalom alapján
+        self.type_list.setFixedWidth(
+            self.type_list.sizeHintForColumn(0) + 20  # +20 a görgetősávnak
+        )
+        type_container.addWidget(self.type_list)
+        layout.addLayout(type_container)
+        
         # Mezők konténer
         self.fields_container = QWidget()
         self.fields_layout = QVBoxLayout()
+        self.fields_layout.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.fields_container.setLayout(self.fields_layout)
         self.fields_container.hide()
+        
+        # A mezők konténer szélességének beállítása a dialog 90%-ára
+        self.fields_container.setMinimumWidth(int(dialog_width * 0.9))
         layout.addWidget(self.fields_container)
         
         # Gombok
@@ -86,6 +115,7 @@ class ElementEditorDialog(QDialog):
         
         self.next_button = QPushButton(self.parent.config_manager.get_translation('next'))
         self.next_button.clicked.connect(self.show_fields)
+        self.next_button.setEnabled(False)  # Kezdetben inaktív
         button_layout.addWidget(self.next_button)
         
         self.add_button = QPushButton(self.parent.config_manager.get_translation('add'))
@@ -116,6 +146,8 @@ class ElementEditorDialog(QDialog):
         
         # Mezők címke
         fields_label = QLabel(self.parent.config_manager.get_translation('fill_element_data'))
+        fields_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+        fields_label.setAlignment(Qt.AlignLeft)
         self.fields_layout.addWidget(fields_label)
         
         # Típus geometria lekérése
@@ -140,14 +172,11 @@ class ElementEditorDialog(QDialog):
                     
                     # Beviteli mező típus alapján
                     if slot_type == 'TEXT':
-                        if '\n' in slot_default:
-                            # Többsoros szöveg
-                            widget = QTextEdit()
-                            widget.setPlainText(slot_default)
-                        else:
-                            # Egysoros szöveg
-                            widget = QLineEdit()
-                            widget.setText(slot_default)
+                        # Mindig többsoros szövegmező, 5 sor magassággal
+                        widget = QTextEdit()
+                        widget.setMinimumHeight(100)  # 5 sor magasság (kb. 20 pixel/sor)
+                        widget.setMaximumHeight(100)
+                        widget.setPlainText(slot_default)
                     elif slot_type == 'FILE':
                         # Fájl kiválasztó gomb
                         widget = QPushButton(self.parent.config_manager.get_translation('file_upload'))
@@ -168,13 +197,28 @@ class ElementEditorDialog(QDialog):
                     self.fields_layout.addWidget(widget)
                     self.field_widgets[slot_id] = widget
                     
+                    # Térköz hozzáadása a mezők közé
+                    spacer = QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Fixed)
+                    self.fields_layout.addItem(spacer)
+                    
         # Stretch hozzáadása
         self.fields_layout.addStretch()
+        
+    def showEvent(self, event):
+        """Megjelenéskor középre pozicionálás"""
+        parent_rect = self.parent.rect()
+        self.move(
+            self.parent.mapToGlobal(parent_rect.center()) - 
+            self.rect().center()
+        )
+        
+        # ConfigManager újratöltése az aktuális nyelvvel
+        self.parent.config_manager.load_translations()
         
     def on_type_selected(self, item):
         """Típus kiválasztás eseménykezelő"""
         self.selected_type = item.text()
-        self.next_button.setEnabled(True)
+        self.next_button.setEnabled(True)  # Típus kiválasztásakor aktiválódik
         
     def show_type_selection(self):
         """Típus választó megjelenítése"""
@@ -564,12 +608,17 @@ class VanDoorMainWindow(QMainWindow):
 
     def handle_new_button_click(self, position, row):
         """Új elem gomb kezelése"""
+        # ConfigManager újratöltése az aktuális nyelvvel
+        self.config_manager.load_translations()
+        
         # Elem szerkesztő megjelenítése
         if hasattr(self, 'element_editor') and self.element_editor:
             self.element_editor.close()
         self.element_editor = ElementEditorDialog(self, self.doc_info)
         self.element_editor.position = position
-        self.element_editor.show()
+        if self.element_editor.exec_() == QDialog.Accepted:
+            self.update_elements_table()
+            self.save_doc_info()
         self.temporarily_disable_position(position, 'new')
 
     def handle_down_button_click(self, position):
@@ -768,6 +817,7 @@ class VanDoorMainWindow(QMainWindow):
         # Elemek listájának konvertálása DocumentElement objektumokká
         elements = []
         for element_dict in self.doc_info['elements']:
+            # DocumentElement objektum létrehozása a szótárból
             element = DocumentElement(
                 name=element_dict['name'],
                 content=element_dict['content'],
@@ -822,6 +872,7 @@ class VanDoorMainWindow(QMainWindow):
         # Elemek listájának konvertálása DocumentElement objektumokká
         elements = []
         for element_dict in self.doc_info['elements']:
+            # DocumentElement objektum létrehozása a szótárból
             element = DocumentElement(
                 name=element_dict['name'],
                 content=element_dict['content'],
