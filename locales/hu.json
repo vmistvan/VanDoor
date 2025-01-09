@@ -22,6 +22,8 @@
     "load_bookmark": "Könyvjelző betöltése",
     "bookmark_label": "Könyvjelző",
     "add_element_title": "Új elem hozzáadása",
+    "choose_element_type": "Válassza ki az elem típusát:",
+    "fill_element_data": "Töltse ki az elem adatait:",
     "next": "Tovább",
     "cancel": "Mégse",
     "back": "Visszalépés",

@@ -182,24 +182,45 @@ class Document:
 
     @classmethod
     def from_csv(cls, filename: str, document_name: str):
-        import os
-        filepath = os.path.join(os.path.dirname(__file__), 'pages', filename)
-        df = pd.read_csv(filepath)
+        """
+        Dokumentum betöltése CSV fájlból
+        
+        :param filename: A CSV fájl neve
+        :param document_name: A dokumentum neve
+        :return: Document objektum
+        """
+        import csv
+        
+        # Új dokumentum létrehozása
         document = cls(document_name)
         
-        for _, row in df.iterrows():
-            element = DocumentElement(
-                name=row['name'],
-                content=row['content'],
-                element_type=DocumentElementType[row['type']],
-                status=DocumentElementStatus[row['status']],
-                pid=row['pid'],
-                position=row['position']
-            )
-            element.oid = str(row['oid'])  # Konvertáljuk string-gé az oid-t
-            document.elements.append(element)
-        
-        return document
+        try:
+            with open(filename, 'r', encoding='utf-8') as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    # Enum értékek konvertálása
+                    element_type = DocumentElementType[row['type']] if row['type'] else None
+                    element_status = DocumentElementStatus[row['status']] if row['status'] else None
+                    
+                    # Elem létrehozása
+                    element = DocumentElement(
+                        name=row['name'].strip('"'),
+                        content=row['content'].strip('"'),
+                        element_type=element_type,
+                        status=element_status,
+                        pid=row['pid'].strip('"'),
+                        position=int(row['position'])
+                    )
+                    element.oid = row['oid'].strip('"')
+                    
+                    # Elem hozzáadása a dokumentumhoz
+                    document.elements.append(element)
+                    
+            return document
+            
+        except Exception as e:
+            print(f"Hiba a dokumentum betöltése során: {e}")
+            return None
 
     def export_to_zip(self, base_dir: str = None):
         """

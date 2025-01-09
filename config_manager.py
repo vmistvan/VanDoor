@@ -16,6 +16,10 @@ class ConfigManager:
         # Konfiguráció betöltése
         self.config = self._load_json(self.config_file)
         self.state = self._load_json(self.state_file)
+        
+        # Fordítások betöltése
+        self.translations = {}
+        self.load_translations()
     
     def _load_json(self, file_path: str) -> Dict[str, Any]:
         """JSON fájl betöltése"""
@@ -96,6 +100,48 @@ class ConfigManager:
         
         # Állapot mentése
         return self._save_json(self.state_file, self.state)
+    
+    def load_translations(self):
+        """Fordítások betöltése"""
+        # Aktuális nyelv lekérése
+        current_language = self.get_state('current_language', 'en')
+        
+        # Fordítások betöltése
+        locale_file = os.path.join(os.path.dirname(self.config_dir), "locales", f"{current_language}.json")
+        try:
+            with open(locale_file, 'r', encoding='utf-8') as f:
+                self.translations = json.load(f)
+        except FileNotFoundError:
+            print(f"A {locale_file} fordítás fájl nem található!")
+            self.translations = {}
+        except json.JSONDecodeError:
+            print(f"Hiba a {locale_file} fordítás fájl olvasása közben!")
+            self.translations = {}
+            
+    def get_translation(self, key: str, default: str = "") -> str:
+        """
+        Fordítás lekérése
+        
+        :param key: Fordítás kulcs (pl. "window_title" vagy "element_types.TEXT")
+        :param default: Alapértelmezett szöveg, ha a kulcs nem található
+        :return: Lefordított szöveg
+        """
+        # Ha nincs fordítás betöltve, visszaadjuk az alapértelmezettet
+        if not self.translations:
+            return default
+            
+        # Kulcs szétbontása (pl. "element_types.TEXT" -> ["element_types", "TEXT"])
+        keys = key.split('.')
+        value = self.translations
+        
+        # Végigmegyünk a kulcsokon
+        for k in keys:
+            if isinstance(value, dict) and k in value:
+                value = value[k]
+            else:
+                return default
+                
+        return str(value)
     
     def save_window_state(self, x: int, y: int, width: int, height: int, is_maximized: bool) -> bool:
         """

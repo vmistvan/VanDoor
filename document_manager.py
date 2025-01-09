@@ -1,6 +1,57 @@
 from models import DocumentElement, DocumentElementType, TypeGeometry
 
 class DocumentManager:
+    def __init__(self):
+        self.current_document = None
+        import os
+        self.base_path = os.path.dirname(os.path.abspath(__file__))
+        
+    @staticmethod
+    def escape_content(content: str) -> str:
+        """Szöveg biztonságos formára alakítása tároláshoz"""
+        if not content:
+            return ""
+        
+        # Speciális karakterek escape-elése
+        replacements = {
+            '\n': '\\n',    # Újsor
+            '\r': '\\r',    # Kocsi vissza
+            '\t': '\\t',    # Tab
+            '<': '&lt;',    # HTML tag kezdete
+            '>': '&gt;',    # HTML tag vége
+            '&': '&amp;',   # HTML és karakter
+            '"': '&quot;',  # Idézőjel
+            "'": '&apos;',  # Aposztróf
+        }
+        
+        for old, new in replacements.items():
+            content = content.replace(old, new)
+        
+        return content
+        
+    @staticmethod
+    def unescape_content(content: str) -> str:
+        """Tárolt szöveg visszaalakítása megjelenítéshez"""
+        if not content:
+            return ""
+            
+        # Speciális karakterek visszaalakítása
+        replacements = {
+            '\\n': '\n',    # Újsor
+            '\\r': '\r',    # Kocsi vissza
+            '\\t': '\t',    # Tab
+            '&lt;': '<',    # HTML tag kezdete
+            '&gt;': '>',    # HTML tag vége
+            '&amp;': '&',   # HTML és karakter
+            '&quot;': '"',  # Idézőjel
+            '&apos;': "'",  # Aposztróf
+        }
+        
+        for old, new in replacements.items():
+            content = content.replace(old, new)
+            
+        return content
+        
     @staticmethod
     def show_element(element: DocumentElement) -> dict:
         """
@@ -19,7 +70,7 @@ class DocumentManager:
         return {
             'oid': element.oid,
             'name': element.name,
-            'content': element.content,
+            'content': DocumentManager.unescape_content(element.content),
             'type': element.type.name if element.type else None,  
             'status': element.status.name if element.status else None,  
             'pid': element.pid,
@@ -116,7 +167,7 @@ class DocumentManager:
             ),
             DocumentElementType.LINK: TypeGeometry(
                 type_id="LINK",
-                wrap="<A HREF='doc#>.csv'>#></A>",
+                wrap="<A HREF='doc#>.csv'>#</A>",
                 slot_ids="PAGEID#>LINKTEXT",
                 slot_names="Page#>Link Text",
                 slot_types="PAGEID#>TEXT",
@@ -124,7 +175,7 @@ class DocumentManager:
             ),
             DocumentElementType.PATH: TypeGeometry(
                 type_id="PATH",
-                wrap="<A HREF='doc#>.csv'>#></A>",
+                wrap="<A HREF='doc#>.csv'>#</A>",
                 slot_ids="PAGEID#>TITLE",
                 slot_names="Page#>Title Text",
                 slot_types="HIDDEN#>HIDDEN",
@@ -132,8 +183,7 @@ class DocumentManager:
             )
         }
 
-    @staticmethod
-    def show_page(oid: str, name: str) -> dict:
+    def show_page(self, oid: str, name: str) -> dict:
         """
         Oldal betöltése CSV fájlból
         
@@ -142,21 +192,22 @@ class DocumentManager:
         :return: Az oldal adatait tartalmazó szótár
         """
         from models import Document, DocumentElementType
+        import os
         
         try:
             # Dokumentum betöltése CSV-ből
-            filename = f"doc{oid}.csv"
+            filename = os.path.join(self.base_path, "pages", f"doc{oid}.csv")
             document = Document.from_csv(filename, name)
             
             # Dokumentum elemek rendezése pozíció szerint
-            sorted_elements = sorted(document.elements, key=lambda x: x.position)
+            document.elements.sort(key=lambda x: x.position)
             
             # Elemek típus szerinti csoportosítása
             path_elements = []
             subpage_elements = []
             other_elements = []
             
-            for elem in sorted_elements:
+            for elem in document.elements:
                 elem_info = DocumentManager.show_element(elem)
                 if elem.type == DocumentElementType.PATH:
                     path_elements.append(elem_info)
@@ -166,7 +217,10 @@ class DocumentManager:
                     other_elements.append(elem_info)
             
             # Ha van legalább egy elem, használjuk az első elem pid-jét
-            pid = sorted_elements[0].pid if sorted_elements else None
+            pid = document.elements[0].pid if document.elements else None
+            
+            # Dokumentum mentése az osztály példányban
+            self.current_document = document
             
             return {
                 'oid': oid,
@@ -188,64 +242,45 @@ class DocumentManager:
         """Dokumentum mentése CSV formátumban
         
         Args:
-            doc_info (dict): A dokumentum adatai, ami tartalmazza az elements, path és subpages listákat
+            doc_info (dict): A dokumentum adatai, ami tartalmazza az elements listát
         """
-        if not doc_info or 'oid' not in doc_info:
+        if not doc_info or 'oid' not in doc_info or 'elements' not in doc_info:
             return False
             
+        import os
         # CSV fájl neve az oid alapján
-        filename = f"pages/doc{doc_info['oid']}.csv"
+        filename = os.path.join(self.base_path, "pages", f"doc{doc_info['oid']}.csv")
         
         try:
             with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
                 # Fejléc írása
                 csvfile.write("oid,name,content,type,status,pid,position\n")
                 
-                def format_value(value):
-                    """Érték formázása CSV-hez"""
-                    if value is None:
-                        return '""'
-                    # Ha az érték szám, ne tegyük idézőjelbe
-                    if isinstance(value, (int, float)):
-                        return str(value)
-                    # Egyébként idézőjelbe tesszük és escape-eljük a belső idézőjeleket
-                    return '"' + str(value).replace('"', '""') + '"'
+                # Elemek rendezése position szerint
+                sorted_elements = sorted(doc_info['elements'], key=lambda x: x.position)
                 
-                def write_element(element):
-                    """Egy elem sorának írása"""
-                    line = (
-                        f"{format_value(element.get('oid'))},"
-                        f"{format_value(element.get('name'))},"
-                        f"{format_value(element.get('content'))},"
-                        f"{format_value(element.get('type'))},"
-                        f"{format_value(element.get('status'))},"
-                        f"{format_value(element.get('pid'))},"
-                        f"{format_value(element.get('position'))}\n"
-                    )
-                    csvfile.write(line)
-                    # print(f"Írás: {line.strip()}")
+                # Sorok írása
+                for element in sorted_elements:
+                    # Értékek előkészítése és escape-elése
+                    values = [
+                        f'"{str(element.oid)}"',
+                        f'"{element.name}"',
+                        f'"{self.escape_content(element.content)}"',
+                        f'"{element.type.name if element.type else ""}"',
+                        f'"{element.status.name if element.status else ""}"',
+                        str(element.pid),
+                        str(element.position)
+                    ]
+                    
+                    csvfile.write(",".join(values) + "\n")
                 
-                # Elements lista írása
-                if 'elements' in doc_info:
-                    # print("\nElements írása:")
-                    for element in doc_info['elements']:
-                        write_element(element)
-                
-                # Path lista írása
-                if 'path' in doc_info:
-                    # print("\nPath írása:")
-                    for path in doc_info['path']:
-                        write_element(path)
-                
-                # Subpages lista írása
-                if 'subpages' in doc_info:
-                    # print("\nSubpages írása:")
-                    for subpage in doc_info['subpages']:
-                        write_element(subpage)
+            # Frissítjük a current_document-et
+            self.current_document.elements = sorted_elements
             
             return True
+            
         except Exception as e:
-            print(f"Hiba a dokumentum mentése közben: {e}")
+            print(f"Hiba a dokumentum mentése során: {e}")
             return False
 
 # Példa használat

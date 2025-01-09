@@ -3,6 +3,7 @@
     "documents": "Documents",
     "new_element": "New Element",
     "move_up": "Move Up",
+    "new_subpage": "New Subpage",
     "move_down": "Move Down",
     "path": "Path",
     "subpages": "Subpages",
@@ -17,15 +18,16 @@
         "PAGE": "Page",
         "LINK": "Link"
     },
-    "new_subpage": "New Subpage",
     "save_bookmark": "Save Bookmark",
     "load_bookmark": "Load Bookmark",
-    "bookmark_label": "Bookmark",
+    "bookmark_label": "Bookmark Label",
     "add_element_title": "Add New Element",
+    "choose_element_type": "Choose element type:",
+    "fill_element_data": "Fill element data:",
     "next": "Next",
-    "cancel": "Cancel",
     "back": "Back",
+    "cancel": "Cancel",
     "add": "Add",
-    "select_type": "Select Element Type",
-    "file_upload": "Upload File"
+    "file_upload": "Choose File",
+    "select_type": "Choose element type:"
 }

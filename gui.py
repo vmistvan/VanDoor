@@ -1,16 +1,23 @@
 import sys
+import os
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                            QHBoxLayout, QTreeWidget, QTreeWidgetItem, QTextEdit, 
-                            QPushButton, QLabel, QComboBox, QSizePolicy, QTableWidget,
-                            QTableWidgetItem, QHeaderView, QScrollArea, QGroupBox, QFrame,
-                            QDialog, QLineEdit, QSpinBox, QFileDialog, QStackedWidget,
-                            QListWidget, QListWidgetItem)
+
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QPushButton, QLabel, QScrollArea, QDialog, QListWidget,
+    QListWidgetItem, QLineEdit, QTextEdit, QSpinBox, QSizePolicy,
+    QSpacerItem, QStackedWidget, QFileDialog, QTableWidget, 
+    QTableWidgetItem, QHeaderView, QComboBox, QTreeWidget, 
+    QTreeWidgetItem, QGroupBox, QFrame
+)
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
-from document_manager import DocumentManager
-from translations import Translator
+from PyQt5.QtGui import QFont
+
 from config_manager import ConfigManager
+from document_manager import DocumentManager
+from models import DocumentElement, DocumentElementType, DocumentElementStatus
+from translations import Translator
 
 class ClickableLabel(QLabel):
     clicked = pyqtSignal(str)  # Signal a kattintás eseményhez
@@ -26,126 +33,156 @@ class ClickableLabel(QLabel):
             self.clicked.emit(self.content)
 
 class ElementEditorDialog(QDialog):
-    def __init__(self, parent, translator, doc_manager, mode="NEW", position=0):
+    def __init__(self, parent=None, doc_info=None):
         super().__init__(parent)
-        self.translator = translator
-        self.doc_manager = doc_manager
         self.parent = parent
-        self.mode = mode
-        self.position = position
+        self.doc_info = doc_info
+        self.doc_manager = parent.doc_manager
         self.selected_type = None
         self.field_widgets = {}
-        self.init_ui()
+        self.position = None
         
-    def init_ui(self):
-        """Dialog felületének inicializálása"""
-        # Ablak beállítások
-        self.setWindowTitle(self.translator.get_text('add_element_title'))
+        # Dialog beállítások
+        self.setWindowTitle(self.parent.config_manager.get_translation('add_element_title'))
+        self.setMinimumWidth(400)
         self.setModal(True)
         
-        # Fő layout
-        main_layout = QVBoxLayout(self)
+        # Layout beállítások
+        layout = QVBoxLayout()
+        self.setLayout(layout)
         
-        # Stack widget a lépésekhez
-        self.stack = QStackedWidget()
+        # Típus választó lista
+        type_label = QLabel(self.parent.config_manager.get_translation('choose_element_type'))
+        layout.addWidget(type_label)
         
-        # Első oldal: típus választó
-        type_page = QWidget()
-        type_layout = QVBoxLayout(type_page)
-        
-        # Típus lista
         self.type_list = QListWidget()
-        for type_id, geometry in DocumentManager.get_type_geometries().items():
-            item = QListWidgetItem(self.translator.get_text(f'element_types.{type_id}'))
-            item.setData(Qt.UserRole, geometry)
-            self.type_list.addItem(item)
-        type_layout.addWidget(self.type_list)
+        layout.addWidget(self.type_list)
         
-        # Gombok az első oldalhoz
-        type_buttons = QHBoxLayout()
-        self.next_button = QPushButton(self.translator.get_text('next'))
-        cancel_button = QPushButton(self.translator.get_text('cancel'))
-        type_buttons.addWidget(cancel_button)
-        type_buttons.addWidget(self.next_button)
-        type_layout.addLayout(type_buttons)
+        # Típusok hozzáadása a listához
+        for type_name in DocumentElementType.__members__:
+            # A fordítás lekérése az element_types objektumból
+            translated_name = self.parent.config_manager.get_translation(f'element_types.{type_name}')
+            if translated_name:
+                item = QListWidgetItem(type_name)
+                item.setData(Qt.UserRole, translated_name)  # Tároljuk a fordítást
+                self.type_list.addItem(item)
         
-        # Második oldal: tartalom szerkesztő
-        content_page = QWidget()
-        content_layout = QVBoxLayout(content_page)
+        # Mezők konténer
+        self.fields_container = QWidget()
+        self.fields_layout = QVBoxLayout()
+        self.fields_container.setLayout(self.fields_layout)
+        self.fields_container.hide()
+        layout.addWidget(self.fields_container)
         
-        # Tartalom mezők
-        self.content_fields = QWidget()
-        self.content_fields_layout = QVBoxLayout(self.content_fields)
-        content_layout.addWidget(self.content_fields)
+        # Gombok
+        button_layout = QHBoxLayout()
         
-        # Gombok a második oldalhoz
-        content_buttons = QHBoxLayout()
-        back_button = QPushButton(self.translator.get_text('back'))
-        add_button = QPushButton(self.translator.get_text('add'))
-        cancel_button2 = QPushButton(self.translator.get_text('cancel'))
-        content_buttons.addWidget(cancel_button2)
-        content_buttons.addWidget(back_button)
-        content_buttons.addWidget(add_button)
-        content_layout.addLayout(content_buttons)
+        self.back_button = QPushButton(self.parent.config_manager.get_translation('back'))
+        self.back_button.clicked.connect(self.show_type_selection)
+        self.back_button.hide()
+        button_layout.addWidget(self.back_button)
         
-        # Oldalak hozzáadása a stack-hez
-        type_page.setLayout(type_layout)
-        content_page.setLayout(content_layout)
-        self.stack.addWidget(type_page)
-        self.stack.addWidget(content_page)
-        main_layout.addWidget(self.stack)
+        button_layout.addStretch()
         
-        # Események
-        cancel_button.clicked.connect(self.reject)
-        cancel_button2.clicked.connect(self.reject)
-        self.next_button.clicked.connect(self.show_content_page)
-        back_button.clicked.connect(lambda: self.stack.setCurrentIndex(0))
-        add_button.clicked.connect(self.add_element)
+        self.next_button = QPushButton(self.parent.config_manager.get_translation('next'))
+        self.next_button.clicked.connect(self.show_fields)
+        button_layout.addWidget(self.next_button)
         
-        # Méret beállítása
-        self.resize(400, 500)
+        self.add_button = QPushButton(self.parent.config_manager.get_translation('add'))
+        self.add_button.clicked.connect(self.add_element)
+        self.add_button.hide()
+        button_layout.addWidget(self.add_button)
         
-    def show_content_page(self):
-        """Második oldal megjelenítése"""
-        if not self.type_list.currentItem():
+        self.cancel_button = QPushButton(self.parent.config_manager.get_translation('cancel'))
+        self.cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(self.cancel_button)
+        
+        layout.addLayout(button_layout)
+        
+        # Típus kiválasztás eseménykezelő
+        self.type_list.itemClicked.connect(self.on_type_selected)
+        
+    def show_fields(self):
+        """Mezők megjelenítése"""
+        if not self.selected_type:
             return
             
-        # Kiválasztott típus mentése
-        self.selected_type = self.type_list.currentItem().data(Qt.UserRole)
+        # UI elemek átváltása
+        self.type_list.hide()
+        self.next_button.hide()
+        self.fields_container.show()
+        self.back_button.show()
+        self.add_button.show()
         
-        # Tartalom mezők törlése
-        for i in reversed(range(self.content_fields_layout.count())): 
-            self.content_fields_layout.itemAt(i).widget().setParent(None)
+        # Mezők címke
+        fields_label = QLabel(self.parent.config_manager.get_translation('fill_element_data'))
+        self.fields_layout.addWidget(fields_label)
         
-        # Slot-ok feldolgozása
-        slot_ids = self.selected_type.slot_ids.split("#>")
-        slot_names = self.selected_type.slot_names.split("#>")
-        slot_types = self.selected_type.slot_types.split("#>")
+        # Típus geometria lekérése
+        type_geometries = self.doc_manager.get_type_geometries()
+        type_geometry = type_geometries.get(DocumentElementType[self.selected_type])
         
-        # Mezők létrehozása
-        self.field_widgets = {}
-        for slot_id, slot_name, slot_type in zip(slot_ids, slot_names, slot_types):
-            if slot_type == "HIDDEN":
-                continue
-                
-            # Címke
-            label = QLabel(slot_name)
-            self.content_fields_layout.addWidget(label)
+        if type_geometry:
+            # Slot ID-k és nevek szétválasztása
+            slot_ids = type_geometry.slot_ids.split('#>')
+            slot_names = type_geometry.slot_names.split('#>')
+            slot_types = type_geometry.slot_types.split('#>')
+            slot_defaults = type_geometry.slot_defaults.split('#>')
             
-            # Beviteli mező típus szerint
-            if slot_type == "TEXT":
-                field = QLineEdit()
-            elif slot_type == "FILE":
-                field = QPushButton(self.translator.get_text('file_upload'))
-                field.clicked.connect(lambda s=slot_id: self.select_file(s))
-            elif slot_type == "INTEGER":
-                field = QSpinBox()
-            
-            self.field_widgets[slot_id] = field
-            self.content_fields_layout.addWidget(field)
+            # Mezők létrehozása
+            for i, (slot_id, slot_name, slot_type, slot_default) in enumerate(
+                zip(slot_ids, slot_names, slot_types, slot_defaults)
+            ):
+                if slot_type != 'HIDDEN':
+                    # Címke hozzáadása
+                    label = QLabel(slot_name)
+                    self.fields_layout.addWidget(label)
+                    
+                    # Beviteli mező típus alapján
+                    if slot_type == 'TEXT':
+                        if '\n' in slot_default:
+                            # Többsoros szöveg
+                            widget = QTextEdit()
+                            widget.setPlainText(slot_default)
+                        else:
+                            # Egysoros szöveg
+                            widget = QLineEdit()
+                            widget.setText(slot_default)
+                    elif slot_type == 'FILE':
+                        # Fájl kiválasztó gomb
+                        widget = QPushButton(self.parent.config_manager.get_translation('file_upload'))
+                        widget.clicked.connect(
+                            lambda checked, slot_id=slot_id: self.select_file(slot_id)
+                        )
+                    elif slot_type == 'PAGEID':
+                        # Oldal azonosító választó
+                        widget = QSpinBox()
+                        widget.setMinimum(1)
+                        widget.setMaximum(9999)
+                        widget.setValue(int(slot_default) if slot_default.isdigit() else 1)
+                    else:
+                        # Alapértelmezett: egysoros szöveg
+                        widget = QLineEdit()
+                        widget.setText(slot_default)
+                        
+                    self.fields_layout.addWidget(widget)
+                    self.field_widgets[slot_id] = widget
+                    
+        # Stretch hozzáadása
+        self.fields_layout.addStretch()
         
-        # Váltás a második oldalra
-        self.stack.setCurrentIndex(1)
+    def on_type_selected(self, item):
+        """Típus kiválasztás eseménykezelő"""
+        self.selected_type = item.text()
+        self.next_button.setEnabled(True)
+        
+    def show_type_selection(self):
+        """Típus választó megjelenítése"""
+        self.type_list.show()
+        self.next_button.show()
+        self.fields_container.hide()
+        self.back_button.hide()
+        self.add_button.hide()
         
     def select_file(self, slot_id):
         """Fájl kiválasztása"""
@@ -163,22 +200,88 @@ class ElementEditorDialog(QDialog):
         for slot_id, widget in self.field_widgets.items():
             if isinstance(widget, QLineEdit):
                 values[slot_id] = widget.text()
+            elif isinstance(widget, QTextEdit):
+                values[slot_id] = widget.toPlainText()
             elif isinstance(widget, QPushButton):  # FILE típus
                 values[slot_id] = widget.text()
             elif isinstance(widget, QSpinBox):
                 values[slot_id] = str(widget.value())
         
-        # TODO: Elem létrehozása és hozzáadása
-        self.close()
+        # Config és State kezelése
+        config_manager = self.parent.config_manager
         
-    def showEvent(self, event):
-        """Megjelenéskor középre pozicionálás"""
-        parent_rect = self.parent.rect()
-        self.move(
-            self.parent.mapToGlobal(parent_rect.center()) - 
-            self.rect().center()
+        # Next OID kezelése
+        next_oid = config_manager.get_state('next_oid', -1)
+        if next_oid == -1:
+            next_oid = config_manager.get_config('oid_sequence_starts', 1)
+            config_manager.set_state('next_oid', next_oid)
+        
+        # Elem típusának neve (pl. "TEXT", "BOLDTEXT")
+        type_name = self.selected_type
+        
+        # Position konvertálása int típusra és növelése
+        insert_position = int(self.position) + 1
+        
+        # Új elem létrehozása
+        from models import DocumentElement, DocumentElementType, DocumentElementStatus
+        new_element = DocumentElement(
+            name=f"{type_name}{next_oid}",
+            content="#>".join(values.values()),
+            element_type=DocumentElementType[type_name],
+            status=DocumentElementStatus.NEW,
+            pid=self.doc_info['elements'][0].get('pid', '1') if self.doc_info['elements'] else "1",
+            position=insert_position
         )
-
+        
+        # Az oid manuális beállítása
+        new_element.oid = str(next_oid)
+        
+        # Position értékek módosítása a dokumentumban
+        elements = []
+        for element_dict in self.doc_info['elements']:
+            # DocumentElement objektum létrehozása a szótárból
+            element = DocumentElement(
+                name=element_dict['name'],
+                content=element_dict['content'],
+                element_type=DocumentElementType[element_dict['type']],
+                status=DocumentElementStatus[element_dict['status']],
+                pid=element_dict['pid'],
+                position=int(element_dict['position'])
+            )
+            element.oid = element_dict['oid']
+            
+            # Ha az elem pozíciója nagyobb vagy egyenlő az új elem pozíciójával,
+            # növeljük eggyel
+            if element.position >= insert_position:
+                element.position += 1
+                
+            elements.append(element)
+        
+        # Új elem beszúrása
+        elements.append(new_element)
+        
+        # Elemek rendezése position szerint
+        elements.sort(key=lambda x: x.position)
+        
+        # Dokumentum mentése
+        self.doc_manager.write_document({
+            'oid': self.doc_info['oid'],
+            'name': self.doc_info['name'],
+            'elements': elements
+        })
+        
+        # Next OID növelése és mentése
+        config_manager.set_state('next_oid', next_oid + 1)
+        
+        # Dialog bezárása
+        self.accept()
+        
+        # Dokumentum újratöltése a főablakban
+        self.parent.load_initial_document(
+            self.doc_info['oid'],
+            self.doc_info['name']
+        )
+        
 class VanDoorMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -464,7 +567,8 @@ class VanDoorMainWindow(QMainWindow):
         # Elem szerkesztő megjelenítése
         if hasattr(self, 'element_editor') and self.element_editor:
             self.element_editor.close()
-        self.element_editor = ElementEditorDialog(self, self.translator, self.doc_manager, mode="NEW", position=position)
+        self.element_editor = ElementEditorDialog(self, self.doc_info)
+        self.element_editor.position = position
         self.element_editor.show()
         self.temporarily_disable_position(position, 'new')
 
@@ -648,68 +752,124 @@ class VanDoorMainWindow(QMainWindow):
         page, title = content.split('#>')
         self.load_initial_document(page, title)
 
-    def move_element_up(self, current_position):
-        """Elem mozgatása felfelé a position érték alapján"""
-        if not hasattr(self, 'doc_info') or 'elements' not in self.doc_info:
+    def move_element_up(self, position):
+        """
+        Elem mozgatása felfelé
+        
+        :param position: Az elem jelenlegi pozíciója
+        """
+        from models import DocumentElement, DocumentElementType, DocumentElementStatus
+        
+        # Position konvertálása int típusra
+        current_pos = int(position)
+        if current_pos <= 1:  # Az első elem nem mozgatható feljebb
             return
             
-        # Keressük meg a jelenlegi és az előző elemet
+        # Elemek listájának konvertálása DocumentElement objektumokká
+        elements = []
+        for element_dict in self.doc_info['elements']:
+            element = DocumentElement(
+                name=element_dict['name'],
+                content=element_dict['content'],
+                element_type=DocumentElementType[element_dict['type']],
+                status=DocumentElementStatus[element_dict['status']],
+                pid=element_dict['pid'],
+                position=int(element_dict['position'])
+            )
+            element.oid = element_dict['oid']
+            elements.append(element)
+            
+        # Elemek rendezése position szerint
+        elements.sort(key=lambda x: x.position)
+        
+        # A mozgatandó elem és az előtte lévő elem megkeresése
         current_element = None
         previous_element = None
-        
-        for element in self.doc_info['elements']:
-            if str(element.get('position', '')) == str(current_position):
+        for element in elements:
+            if element.position == current_pos:
                 current_element = element
-            elif str(element.get('position', '')) == str(int(current_position) - 1):
+            elif element.position == current_pos - 1:
                 previous_element = element
                 
         if current_element and previous_element:
             # Pozíciók cseréje
-            current_element['position'] = int(current_position) - 1
-            previous_element['position'] = int(current_position)
-            
-            # Lista rendezése position szerint
-            self.doc_info['elements'].sort(key=lambda x: int(x.get('position', 0)))
+            current_element.position, previous_element.position = previous_element.position, current_element.position
             
             # Dokumentum mentése
-            self.doc_manager.write_document(self.doc_info)
+            self.doc_manager.write_document({
+                'oid': self.doc_info['oid'],
+                'name': self.doc_info['name'],
+                'elements': elements
+            })
             
-            # UI frissítése
-            self.load_initial_document(self.current_page, self.current_title)
-
-    def add_new_element(self, row):
-        """Új elem hozzáadása a kiválasztott sor után"""
-        print(f"Új elem hozzáadása a(z) {row}. sor után")
-        # TODO: Implementálja az új elem hozzáadásának logikáját
-
-    def move_element_down(self, current_position):
-        """Elem mozgatása lefelé a position érték alapján"""
-        if not hasattr(self, 'doc_info') or 'elements' not in self.doc_info:
+            # Dokumentum újratöltése
+            self.load_initial_document(
+                self.doc_info['oid'],
+                self.doc_info['name']
+            )
+            
+    def move_element_down(self, position):
+        """
+        Elem mozgatása lefelé
+        
+        :param position: Az elem jelenlegi pozíciója
+        """
+        from models import DocumentElement, DocumentElementType, DocumentElementStatus
+        
+        # Position konvertálása int típusra
+        current_pos = int(position)
+        
+        # Elemek listájának konvertálása DocumentElement objektumokká
+        elements = []
+        for element_dict in self.doc_info['elements']:
+            element = DocumentElement(
+                name=element_dict['name'],
+                content=element_dict['content'],
+                element_type=DocumentElementType[element_dict['type']],
+                status=DocumentElementStatus[element_dict['status']],
+                pid=element_dict['pid'],
+                position=int(element_dict['position'])
+            )
+            element.oid = element_dict['oid']
+            elements.append(element)
+            
+        # Elemek rendezése position szerint
+        elements.sort(key=lambda x: x.position)
+        
+        # Ha az utolsó elem, nem mozgatható lejjebb
+        if current_pos >= len(elements):
             return
             
-        # Keressük meg a jelenlegi és a következő elemet
+        # A mozgatandó elem és az utána következő elem megkeresése
         current_element = None
         next_element = None
-        
-        for element in self.doc_info['elements']:
-            if str(element.get('position', '')) == str(current_position):
+        for element in elements:
+            if element.position == current_pos:
                 current_element = element
-            elif str(element.get('position', '')) == str(int(current_position) + 1):
+            elif element.position == current_pos + 1:
                 next_element = element
                 
         if current_element and next_element:
             # Pozíciók cseréje
-            current_element['position'] = int(current_position) + 1
-            next_element['position'] = int(current_position)
-            
-            # Lista rendezése position szerint
-            self.doc_info['elements'].sort(key=lambda x: int(x.get('position', 0)))
+            current_element.position, next_element.position = next_element.position, current_element.position
             
             # Dokumentum mentése
-            self.doc_manager.write_document(self.doc_info)
+            self.doc_manager.write_document({
+                'oid': self.doc_info['oid'],
+                'name': self.doc_info['name'],
+                'elements': elements
+            })
             
-            # UI frissítése
-            self.load_initial_document(self.current_page, self.current_title)
+            # Dokumentum újratöltése
+            self.load_initial_document(
+                self.doc_info['oid'],
+                self.doc_info['name']
+            )
+            
+    def add_new_element(self, row):
+        """Új elem hozzáadása a kiválasztott sor után"""
+        print(f"Új elem hozzáadása a(z) {row}. sor után")
+        # TODO: Implementálja az új elem hozzáadásának logikáját
 
     def save_current_as_bookmark(self):
         """Aktuális dokumentum mentése könyvjelzőként"""
