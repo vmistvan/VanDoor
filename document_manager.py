@@ -1,10 +1,48 @@
 from models import DocumentElement, DocumentElementType, TypeGeometry
+import os
+import pandas as pd
 
 class DocumentManager:
     def __init__(self):
         self.current_document = None
-        import os
         self.base_path = os.path.dirname(os.path.abspath(__file__))
+        self.type_geometries = {}  # TypeGeometry objektumok cache-elése
+        self.load_type_geometries()  # Típusok betöltése inicializáláskor
+        
+    def load_type_geometries(self):
+        """TypeGeometry objektumok betöltése az elementtypes.csv fájlból"""
+        try:
+            csv_path = os.path.join(self.base_path, "elementtypes.csv")
+            df = pd.read_csv(csv_path)
+            
+            # Típusok betöltése a DataFrame-ből
+            for _, row in df.iterrows():
+                type_id = row['type_id']               
+                # TypeGeometry objektum létrehozása
+                geometry = TypeGeometry(
+                    type_id=type_id,
+                    type_name=row['type_name'],
+                    body_type=row['body_type'],
+                    wrap=row['wrap'],
+                    slot_ids=row['slot_ids'],
+                    slot_names=row['slot_names'],
+                    slot_types=row['slot_types'],
+                    slot_defaults=row['slot_defaults'] if pd.notna(row['slot_defaults']) else ""
+                )
+                # Megfelelő DocumentElementType objektum lekérése vagy létrehozása
+                element_type = DocumentElementType.get(type_id)
+                if element_type:
+                    self.type_geometries[element_type] = geometry
+                else:
+                    print(f"Hiba a típus betöltése során: {type_id}")
+                    
+        except Exception as e:
+            print(f"Hiba a típusok betöltése során: {e}")
+            self.type_geometries = {}
+            
+    def get_type_geometries(self):
+        """TypeGeometry objektumok visszaadása"""
+        return self.type_geometries
         
     @staticmethod
     def escape_content(content: str) -> str:
@@ -52,8 +90,7 @@ class DocumentManager:
             
         return content
         
-    @staticmethod
-    def show_element(element: DocumentElement) -> dict:
+    def show_element(self, element: DocumentElement) -> dict:
         """
         Megkeresi a DocumentElement típusához tartozó TypeGeometry-t
         és előkészíti a megjelenítéshez szükséges információkat
@@ -61,11 +98,13 @@ class DocumentManager:
         :param element: A megjelenítendő dokumentum elem
         :return: Megjelenítési információkat tartalmazó szótár
         """
-        # Alapértelmezett típusgeometriák
-        type_geometries = DocumentManager.get_type_geometries()
-        
-        # Elem típusgeometriájának kikeresése
-        type_geometry = type_geometries.get(element.type, element.type_geometry)
+        if not element:
+            return None
+            
+        # TypeGeometry keresése
+        type_geometry = self.type_geometries.get(element.type)
+        if not type_geometry:
+            return None
         
         return {
             'oid': element.oid,
@@ -77,110 +116,14 @@ class DocumentManager:
             'position': element.position,
             'geometry': {
                 'type_id': type_geometry.type_id,
+                'type_name': type_geometry.type_name,
+                'body_type': type_geometry.body_type,
                 'wrap': type_geometry.wrap,
                 'slot_ids': type_geometry.slot_ids,
                 'slot_names': type_geometry.slot_names,
                 'slot_types': type_geometry.slot_types,
                 'slot_defaults': type_geometry.slot_defaults
             } if type_geometry else None
-        }
-
-    @staticmethod
-    def get_type_geometries():
-        """
-        Visszaadja az összes típusgeometriát
-        
-        :return: Típusgeometriák szótára, ahol a kulcs a DocumentElementType
-        """
-        return {
-            DocumentElementType.TITLE: TypeGeometry(
-                type_id="TITLE",
-                wrap="<H1>#></H1>",
-                slot_ids="TITLE",
-                slot_names="Title Text",
-                slot_types="TEXT",
-                slot_defaults=""
-            ),
-            DocumentElementType.SUBTITLE: TypeGeometry(
-                type_id="SUBTITLE",
-                wrap="<H2>#></H2>",
-                slot_ids="SUBTITLE",
-                slot_names="Subtitle Text",
-                slot_types="TEXT",
-                slot_defaults=""
-            ),
-            DocumentElementType.SYNOPSIS: TypeGeometry(
-                type_id="SYNOPSIS",
-                wrap="<B>#></B>",
-                slot_ids="SYNOPSIS",
-                slot_names="Synopsis Text",
-                slot_types="TEXT",
-                slot_defaults=""
-            ),
-            DocumentElementType.TEXT: TypeGeometry(
-                type_id="TEXT",
-                wrap="<P>#></P>",
-                slot_ids="TEXT",
-                slot_names="Text Content",
-                slot_types="TEXT",
-                slot_defaults=""
-            ),
-            DocumentElementType.BOLDTEXT: TypeGeometry(
-                type_id="BOLDTEXT",
-                wrap="<B>#></B>",
-                slot_ids="BOLDTEXT",
-                slot_names="Bold Text Content",
-                slot_types="TEXT",
-                slot_defaults=""
-            ),
-            DocumentElementType.PICTURE: TypeGeometry(
-                type_id="PICTURE",
-                wrap="<IMG SRC='pic#.>'></IMG>",
-                slot_ids="PICID#>FILE#>PICNAME#>PICTYPE",
-                slot_names="Picture ID#>Picture File#>Picture Name#>Picture Type",
-                slot_types="HIDDEN#>FILE#>TEXT#>TEXT",
-                slot_defaults=""
-            ),
-            DocumentElementType.POSITION: TypeGeometry(
-                type_id="POSITION",
-                wrap="<B>#><BR>#> - #></B>",
-                slot_ids="NAME#>LATITUDE#>LONGITUDE",
-                slot_names="Position Name#>Latitude#>Longitude",
-                slot_types="TEXT#>TEXT#>TEXT",
-                slot_defaults=""
-            ),
-            DocumentElementType.TABLE: TypeGeometry(
-                type_id="TABLE",
-                wrap="<TABLE>#></TABLE>",
-                slot_ids="ROW#>COLUMN",
-                slot_names="Row Number#>Column Number",
-                slot_types="INTEGER#>INTEGER",
-                slot_defaults="1#>1"
-            ),
-            DocumentElementType.PAGE: TypeGeometry(
-                type_id="PAGE",
-                wrap="<P><A HREF='#'>#</A></P>",
-                slot_ids="PAGEID#>PAGETITLE",
-                slot_names="Page ID#>Page Title",
-                slot_types="HIDDEN#>TEXT",
-                slot_defaults=""
-            ),
-            DocumentElementType.LINK: TypeGeometry(
-                type_id="LINK",
-                wrap="<A HREF='doc#>.csv'>#</A>",
-                slot_ids="PAGEID#>LINKTEXT",
-                slot_names="Page#>Link Text",
-                slot_types="PAGEID#>TEXT",
-                slot_defaults=""
-            ),
-            DocumentElementType.PATH: TypeGeometry(
-                type_id="PATH",
-                wrap="<A HREF='doc#>.csv'>#</A>",
-                slot_ids="PAGEID#>TITLE",
-                slot_names="Page#>Title Text",
-                slot_types="HIDDEN#>HIDDEN",
-                slot_defaults=""
-            )
         }
 
     def show_page(self, oid: str, name: str) -> dict:
@@ -208,13 +151,16 @@ class DocumentManager:
             other_elements = []
             
             for elem in document.elements:
-                elem_info = DocumentManager.show_element(elem)
-                if elem.type == DocumentElementType.PATH:
-                    path_elements.append(elem_info)
-                elif elem.type == DocumentElementType.PAGE:
-                    subpage_elements.append(elem_info)
-                else:
-                    other_elements.append(elem_info)
+                elem_info = self.show_element(elem)
+                if elem_info:
+                    # Típus alapján rendezzük az elemeket
+                    elem_type = elem.type.type_id if elem.type else None
+                    if elem_type == "PATH":
+                        path_elements.append(elem_info)
+                    elif elem_type == "PAGE":
+                        subpage_elements.append(elem_info)
+                    else:
+                        other_elements.append(elem_info)
             
             # Ha van legalább egy elem, használjuk az első elem pid-jét
             pid = document.elements[0].pid if document.elements else None
@@ -238,47 +184,116 @@ class DocumentManager:
             print(f"Hiba a dokumentum betöltése során: {e}")
             return None
 
+    def read_document(self, page="1"):
+        """Dokumentum olvasása fájlból"""
+        try:
+            # CSV fájl beolvasása
+            filename = os.path.join(self.base_path, "pages", f"doc{page}.csv")
+            df = pd.read_csv(filename, dtype=str)  # Minden oszlopot string típusként olvasunk be
+            
+            # Dokumentum adatok inicializálása
+            doc_info = {
+                'oid': page,
+                'name': f"doc{page}",
+                'elements': [],
+                'path': [],
+                'subpages': []
+            }
+            
+            # Sorok feldolgozása
+            for _, row in df.iterrows():
+                element_dict = row.to_dict()
+                
+                # PATH és PAGE típusú elemek külön kezelése
+                if element_dict['type'] == 'PATH':
+                    doc_info['path'].append(element_dict)
+                elif element_dict['type'] == 'PAGE':
+                    doc_info['subpages'].append(element_dict)
+                else:
+                    doc_info['elements'].append(element_dict)
+            
+            return doc_info
+            
+        except FileNotFoundError:
+            print(f"A dokumentum nem található: {filename}")
+            return None
+        except Exception as e:
+            print(f"Hiba a dokumentum olvasása során: {e}")
+            return None
+
     def write_document(self, doc_info):
-        """Dokumentum mentése CSV formátumban
-        
-        Args:
-            doc_info (dict): A dokumentum adatai, ami tartalmazza az elements listát
-        """
-        if not doc_info or 'oid' not in doc_info or 'elements' not in doc_info:
+        """Dokumentum írása fájlba"""
+        if not doc_info or 'oid' not in doc_info:
             return False
             
-        import os
         # CSV fájl neve az oid alapján
         filename = os.path.join(self.base_path, "pages", f"doc{doc_info['oid']}.csv")
         
+        # Összeállítjuk a mentendő elemek listáját
+        elements_to_save = []
+        
+        # Normál elemek hozzáadása
+        for elem in doc_info['elements']:
+            elements_to_save.append({
+                'oid': int(elem.oid),  # oid számként
+                'name': elem.name,
+                'content': self.escape_content(elem.content),
+                'type': elem.type.type_id,
+                'status': elem.status.name,
+                'pid': elem.pid,
+                'position': int(elem.position)  # position számként
+            })
+            
+        # PATH típusú elemek hozzáadása
+        if 'path' in doc_info and doc_info['path']:
+            for path_elem in doc_info['path']:
+                # Csak a szükséges mezőket mentjük, és növeljük a pozíciót
+                elements_to_save.append({
+                    'oid': int(path_elem['oid']),  # oid számként
+                    'name': path_elem['name'],
+                    'content': path_elem['content'],
+                    'type': path_elem['type'],
+                    'status': path_elem['status'],
+                    'pid': path_elem['pid'],
+                    'position': int(path_elem['position']) + 1  # position növelése
+                })
+                
+        # PAGE típusú elemek hozzáadása
+        if 'subpages' in doc_info and doc_info['subpages']:
+            for page_elem in doc_info['subpages']:
+                # Csak a szükséges mezőket mentjük, és növeljük a pozíciót
+                elements_to_save.append({
+                    'oid': int(page_elem['oid']),  # oid számként
+                    'name': page_elem['name'],
+                    'content': page_elem['content'],
+                    'type': page_elem['type'],
+                    'status': page_elem['status'],
+                    'pid': page_elem['pid'],
+                    'position': int(page_elem['position']) + 1  # position növelése
+                })
+
         try:
-            with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
-                # Fejléc írása
-                csvfile.write("oid,name,content,type,status,pid,position\n")
-                
-                # Elemek rendezése position szerint
-                sorted_elements = sorted(doc_info['elements'], key=lambda x: x.position)
-                
-                # Sorok írása
-                for element in sorted_elements:
-                    # Értékek előkészítése és escape-elése
-                    values = [
-                        f'"{str(element.oid)}"',
-                        f'"{element.name}"',
-                        f'"{self.escape_content(element.content)}"',
-                        f'"{element.type.name if element.type else ""}"',
-                        f'"{element.status.name if element.status else ""}"',
-                        str(element.pid),
-                        str(element.position)
-                    ]
-                    
-                    csvfile.write(",".join(values) + "\n")
-                
+            # CSV fájl létrehozása és mentése
+            df = pd.DataFrame(elements_to_save)
+            
+            # Oszlopok típusának beállítása
+            df['oid'] = df['oid'].astype(int)  # oid oszlop egész számmá konvertálása
+            df['position'] = df['position'].astype(int)  # position oszlop egész számmá konvertálása
+            
+            # CSV fájl mentése:
+            # - index=False: ne legyen index oszlop
+            # - quoting=1: QUOTE_MINIMAL - csak akkor használjon idézőjelet, ha szükséges
+            # - quotechar='"': idézőjel karakter
+            # - header=True: oszlopnevek kiírása
+            df.to_csv(filename, 
+                     index=False, 
+                     quoting=1,  # QUOTE_MINIMAL
+                     quotechar='"',
+                     header=True)
+            
             # Frissítjük a current_document-et
-            self.current_document.elements = sorted_elements
-            
+            self.current_document = doc_info
             return True
-            
         except Exception as e:
             print(f"Hiba a dokumentum mentése során: {e}")
             return False
@@ -296,5 +311,5 @@ if __name__ == "__main__":
     )
     
     # Elem megjelenítési információinak lekérése
-    display_info = DocumentManager.show_element(test_element)
+    display_info = DocumentManager().show_element(test_element)
     print(display_info)

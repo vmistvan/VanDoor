@@ -1,5 +1,6 @@
 import sys
 import os
+import json
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -14,9 +15,9 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont
 
-from config_manager import ConfigManager
 from document_manager import DocumentManager
 from models import DocumentElement, DocumentElementType, DocumentElementStatus
+from config_manager import ConfigManager
 from translations import Translator
 
 class ClickableLabel(QLabel):
@@ -77,13 +78,19 @@ class ElementEditorDialog(QDialog):
         self.type_list.setSizeAdjustPolicy(QListWidget.AdjustToContents)
         
         # Típusok hozzáadása a listához
-        for type_name in DocumentElementType.__members__:
-            # A fordítás lekérése az element_types objektumból
-            translated_name = self.parent.config_manager.get_translation(f'element_types.{type_name}')
-            if translated_name:
-                item = QListWidgetItem(type_name)
-                item.setData(Qt.UserRole, translated_name)  # Tároljuk a fordítást
+        type_geometries = self.doc_manager.get_type_geometries()
+        
+        for element_type, geometry in type_geometries.items():
+            
+            stripped = geometry.body_type.strip('"')
+            if stripped == "YES":
+                # print("  -> MEGJELENÍTJÜK")
+                item = QListWidgetItem(geometry.type_name)
+                item.setData(Qt.UserRole, element_type)  # Tároljuk az enum értéket
                 self.type_list.addItem(item)
+            else:
+                pass
+                # print("  -> NEM jelenítjük meg")
         
         # Lista méretének beállítása a tartalom alapján
         self.type_list.setFixedWidth(
@@ -152,7 +159,7 @@ class ElementEditorDialog(QDialog):
         
         # Típus geometria lekérése
         type_geometries = self.doc_manager.get_type_geometries()
-        type_geometry = type_geometries.get(DocumentElementType[self.selected_type])
+        type_geometry = type_geometries.get(DocumentElementType(self.selected_type))
         
         if type_geometry:
             # Slot ID-k és nevek szétválasztása
@@ -217,7 +224,8 @@ class ElementEditorDialog(QDialog):
         
     def on_type_selected(self, item):
         """Típus kiválasztás eseménykezelő"""
-        self.selected_type = item.text()
+        selected_type = item.data(Qt.UserRole)
+        self.selected_type = selected_type.type_id
         self.next_button.setEnabled(True)  # Típus kiválasztásakor aktiválódik
         
     def show_type_selection(self):
@@ -236,7 +244,11 @@ class ElementEditorDialog(QDialog):
             
     def add_element(self):
         """Elem hozzáadása"""
-        if not self.selected_type:
+        from models import DocumentElementType  # Explicit import a függvényen belül
+        
+        # Elem típusának lekérése
+        element_type = DocumentElementType.get(self.selected_type)
+        if not element_type:
             return
             
         # Értékek összegyűjtése
@@ -255,13 +267,16 @@ class ElementEditorDialog(QDialog):
         config_manager = self.parent.config_manager
         
         # Next OID kezelése
-        next_oid = config_manager.get_state('next_oid', -1)
-        if next_oid == -1:
-            next_oid = config_manager.get_config('oid_sequence_starts', 1)
+        next_oid = config_manager.get_state('next_oid', '1')
+        try:
+            next_oid = str(int(next_oid) + 1)
+            config_manager.set_state('next_oid', next_oid)
+        except ValueError:
+            next_oid = '1'
             config_manager.set_state('next_oid', next_oid)
         
         # Elem típusának neve (pl. "TEXT", "BOLDTEXT")
-        type_name = self.selected_type
+        type_name = element_type.type_id
         
         # Position konvertálása int típusra és növelése
         insert_position = int(self.position) + 1
@@ -271,7 +286,7 @@ class ElementEditorDialog(QDialog):
         new_element = DocumentElement(
             name=f"{type_name}{next_oid}",
             content="#>".join(values.values()),
-            element_type=DocumentElementType[type_name],
+            element_type=element_type,
             status=DocumentElementStatus.NEW,
             pid=self.doc_info['elements'][0].get('pid', '1') if self.doc_info['elements'] else "1",
             position=insert_position
@@ -287,7 +302,7 @@ class ElementEditorDialog(QDialog):
             element = DocumentElement(
                 name=element_dict['name'],
                 content=element_dict['content'],
-                element_type=DocumentElementType[element_dict['type']],
+                element_type=DocumentElementType.get(element_dict['type']),
                 status=DocumentElementStatus[element_dict['status']],
                 pid=element_dict['pid'],
                 position=int(element_dict['position'])
@@ -311,11 +326,13 @@ class ElementEditorDialog(QDialog):
         self.doc_manager.write_document({
             'oid': self.doc_info['oid'],
             'name': self.doc_info['name'],
-            'elements': elements
+            'elements': elements,
+            'path': self.doc_info.get('path', []),  # Meglévő path elemek megőrzése
+            'subpages': self.doc_info.get('subpages', [])  # Meglévő subpages elemek megőrzése
         })
         
         # Next OID növelése és mentése
-        config_manager.set_state('next_oid', next_oid + 1)
+        config_manager.set_state('next_oid', str(int(next_oid) + 1))
         
         # Dialog bezárása
         self.accept()
@@ -608,17 +625,16 @@ class VanDoorMainWindow(QMainWindow):
 
     def handle_new_button_click(self, position, row):
         """Új elem gomb kezelése"""
-        # ConfigManager újratöltése az aktuális nyelvvel
-        self.config_manager.load_translations()
-        
-        # Elem szerkesztő megjelenítése
-        if hasattr(self, 'element_editor') and self.element_editor:
+        if hasattr(self, 'element_editor'):
             self.element_editor.close()
         self.element_editor = ElementEditorDialog(self, self.doc_info)
         self.element_editor.position = position
         if self.element_editor.exec_() == QDialog.Accepted:
-            self.update_elements_table()
-            self.save_doc_info()
+            # Az aktuális oldal adataival töltjük újra
+            current_page = self.doc_info.get('oid', '1')
+            current_title = next((elem['content'] for elem in self.doc_info.get('elements', []) 
+                                if elem.get('type') == 'TITLE'), 'VanDoor Test Page')
+            self.load_initial_document(page=current_page, title=current_title)
         self.temporarily_disable_position(position, 'new')
 
     def handle_down_button_click(self, position):
@@ -817,21 +833,41 @@ class VanDoorMainWindow(QMainWindow):
         # Elemek listájának konvertálása DocumentElement objektumokká
         elements = []
         for element_dict in self.doc_info['elements']:
-            # DocumentElement objektum létrehozása a szótárból
+            # Elem típusának lekérése
+            element_type = DocumentElementType.get(element_dict['type'])
+            if not element_type:
+                continue
+                
+            # Elem létrehozása
             element = DocumentElement(
                 name=element_dict['name'],
                 content=element_dict['content'],
-                element_type=DocumentElementType[element_dict['type']],
+                element_type=element_type,
                 status=DocumentElementStatus[element_dict['status']],
                 pid=element_dict['pid'],
                 position=int(element_dict['position'])
             )
             element.oid = element_dict['oid']
+            
+            # Ha az elem pozíciója nagyobb vagy egyenlő az új elem pozíciójával,
+            # növeljük eggyel
+            if element.position >= current_pos:
+                element.position += 1
+                
             elements.append(element)
             
-        # Elemek rendezése position szerint
-        elements.sort(key=lambda x: x.position)
-        
+        # PATH típusú elemek pozícióinak növelése
+        if 'path' in self.doc_info:
+            for path_element in self.doc_info['path']:
+                if int(path_element['position']) >= current_pos:
+                    path_element['position'] = str(int(path_element['position']) + 1)
+                    
+        # PAGE típusú elemek pozícióinak növelése
+        if 'subpages' in self.doc_info:
+            for page_element in self.doc_info['subpages']:
+                if int(page_element['position']) >= current_pos:
+                    page_element['position'] = str(int(page_element['position']) + 1)
+                    
         # A mozgatandó elem és az előtte lévő elem megkeresése
         current_element = None
         previous_element = None
@@ -849,7 +885,9 @@ class VanDoorMainWindow(QMainWindow):
             self.doc_manager.write_document({
                 'oid': self.doc_info['oid'],
                 'name': self.doc_info['name'],
-                'elements': elements
+                'elements': elements,
+                'path': self.doc_info['path'],
+                'subpages': self.doc_info['subpages']
             })
             
             # Dokumentum újratöltése
@@ -872,25 +910,41 @@ class VanDoorMainWindow(QMainWindow):
         # Elemek listájának konvertálása DocumentElement objektumokká
         elements = []
         for element_dict in self.doc_info['elements']:
-            # DocumentElement objektum létrehozása a szótárból
+            # Elem típusának lekérése
+            element_type = DocumentElementType.get(element_dict['type'])
+            if not element_type:
+                continue
+                
+            # Elem létrehozása
             element = DocumentElement(
                 name=element_dict['name'],
                 content=element_dict['content'],
-                element_type=DocumentElementType[element_dict['type']],
+                element_type=element_type,
                 status=DocumentElementStatus[element_dict['status']],
                 pid=element_dict['pid'],
                 position=int(element_dict['position'])
             )
             element.oid = element_dict['oid']
+            
+            # Ha az elem pozíciója nagyobb vagy egyenlő az új elem pozíciójával,
+            # növeljük eggyel
+            if element.position > current_pos:
+                element.position += 1
+                
             elements.append(element)
             
-        # Elemek rendezése position szerint
-        elements.sort(key=lambda x: x.position)
-        
-        # Ha az utolsó elem, nem mozgatható lejjebb
-        if current_pos >= len(elements):
-            return
-            
+        # PATH típusú elemek pozícióinak növelése
+        if 'path' in self.doc_info:
+            for path_element in self.doc_info['path']:
+                if int(path_element['position']) > current_pos:
+                    path_element['position'] = str(int(path_element['position']) + 1)
+                    
+        # PAGE típusú elemek pozícióinak növelése
+        if 'subpages' in self.doc_info:
+            for page_element in self.doc_info['subpages']:
+                if int(page_element['position']) > current_pos:
+                    page_element['position'] = str(int(page_element['position']) + 1)
+                    
         # A mozgatandó elem és az utána következő elem megkeresése
         current_element = None
         next_element = None
@@ -908,7 +962,9 @@ class VanDoorMainWindow(QMainWindow):
             self.doc_manager.write_document({
                 'oid': self.doc_info['oid'],
                 'name': self.doc_info['name'],
-                'elements': elements
+                'elements': elements,
+                'path': self.doc_info['path'],
+                'subpages': self.doc_info['subpages']
             })
             
             # Dokumentum újratöltése
@@ -940,6 +996,23 @@ class VanDoorMainWindow(QMainWindow):
         """Új aloldal hozzáadása"""
         # TODO: Implementáld az új aloldal létrehozását
         pass
+
+    def get_element_types(self):
+        """Visszaadja a választható elem típusokat"""
+        type_geometries = self.doc_manager.get_type_geometries()
+        print("\nget_element_types szűrése:")
+        result = []
+        for t, g in type_geometries.items():
+            print(f"\nVizsgált típus: {t.name}")
+            print(f"  body_type: {g.body_type}")
+            stripped = g.body_type.strip('"')
+            print(f"  body_type stripped: {stripped}")
+            if stripped == "YES":
+                print("  -> HOZZÁADJUK")
+                result.append((t, g.type_name))
+            else:
+                print("  -> NEM adjuk hozzá")
+        return result
 
 def main():
     app = QApplication(sys.argv)

@@ -13,10 +13,16 @@
     "element_content": "Tartalom",
     "element_types": {
         "TITLE": "Cím",
+        "SUBTITLE": "Alcím",
+        "SYNOPSIS": "Szinopszis",
         "TEXT": "Szöveg",
-        "PATH": "Útvonal",
+        "BOLDTEXT": "Kiemelt szöveg",
+        "PICTURE": "Kép",
+        "POSITION": "Pozíció",
+        "TABLE": "Táblázat",
         "PAGE": "Oldal",
-        "LINK": "Hivatkozás"
+        "LINK": "Link",
+        "PATH": "Path"
     },
     "save_bookmark": "Könyvjelző mentése",
     "load_bookmark": "Könyvjelző betöltése",

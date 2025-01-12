@@ -1,35 +1,92 @@
 import uuid
-from typing import List, Dict, Any
-import pandas as pd
+from typing import List, Dict, Any, Optional
 from enum import Enum, auto
+import pandas as pd
 import os
 import shutil
 import zipfile
 from datetime import datetime
 
-class DocumentElementType(Enum):
-    TITLE = auto()
-    SUBTITLE = auto()
-    SYNOPSIS = auto()
-    TEXT = auto()
-    BOLDTEXT = auto()
-    PICTURE = auto()
-    POSITION = auto()
-    TABLE = auto()
-    PAGE = auto()
-    LINK = auto()
-    PATH = auto()
+class DocumentElementType:
+    """Dokumentum elem típusok.
+    Az értékek az elementtypes.csv fájlból töltődnek be."""
+    _instances = {}  # Tárolja az összes létrehozott példányt
+    _initialized = False  # Jelzi, hogy megtörtént-e már az inicializálás
+    
+    def __init__(self, type_id: str):
+        self.type_id = type_id
+        self.name = type_id  # Alapértelmezett név a type_id
+        DocumentElementType._instances[type_id] = self
+    
+    def __str__(self) -> str:
+        return self.type_id
+    
+    def __repr__(self) -> str:
+        return f"DocumentElementType.{self.type_id}"
+    
+    def __eq__(self, other) -> bool:
+        if isinstance(other, str):
+            return self.type_id == other
+        if isinstance(other, DocumentElementType):
+            return self.type_id == other.type_id
+        return False
+    
+    def __hash__(self) -> int:
+        return hash(self.type_id)
+    
+    @classmethod
+    def initialize(cls) -> None:
+        """Betölti az összes típust a CSV fájlból"""
+        if cls._initialized:
+            return
+            
+        try:
+            csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "elementtypes.csv")
+            df = pd.read_csv(csv_path)
+            for _, row in df.iterrows():
+                type_id = row['type_id']
+                # Ha még nem létezik ilyen típus, létrehozzuk
+                if type_id not in cls._instances:
+                    instance = cls(type_id)
+                    instance.name = row['type_name']  # Beállítjuk a nevet a CSV-ből
+                else:
+                    # Ha már létezik, frissítjük a nevet
+                    cls._instances[type_id].name = row['type_name']
+            cls._initialized = True
+        except Exception as e:
+            print(f"Hiba a típusok betöltése során: {e}")
+            # Alapértelmezett típusok hiba esetén
+            for type_id in ['TITLE', 'TEXT', 'PAGE', 'PATH', 'LINK', 'SUBTITLE', 'SYNOPSIS', 'BOLDTEXT', 'PICTURE', 'POSITION', 'TABLE']:
+                cls(type_id)
+            cls._initialized = True
+    
+    @classmethod
+    def get(cls, type_id: str) -> Optional['DocumentElementType']:
+        """Visszaad egy típust az ID alapján"""
+        if not cls._initialized:
+            cls.initialize()
+        return cls._instances.get(type_id)
+    
+    @classmethod
+    def values(cls) -> List['DocumentElementType']:
+        """Visszaadja az összes létező típust"""
+        if not cls._initialized:
+            cls.initialize()
+        return list(cls._instances.values())
+
+# Inicializáljuk a típusokat azonnal a modul betöltésekor
+DocumentElementType.initialize()
 
 class SlotType(Enum):
-    TEXT = ""
-    HPOSITION = "CENTER#>RIGHT#>LEFT"
-    VPOSITION = "TOP#>MIDDLE#>BOTTOM"
-    SIZE = "WIDTH#>HEIGHT"
-    COLOR = "R#>G#>B"
-    HIDDEN = ""
-    FILE = ""
-    INTEGER = 0
-    PAGEID = 0
+    TEXT = auto()
+    HPOSITION = auto()
+    VPOSITION = auto()
+    SIZE = auto()
+    COLOR = auto()
+    HIDDEN = auto()
+    FILE = auto()
+    INTEGER = auto()
+    PAGEID = auto()
 
 class DocumentElementStatus(Enum):
     NEW = auto()
@@ -42,6 +99,8 @@ class TypeGeometry:
     def __init__(
         self, 
         type_id: str, 
+        type_name: str,
+        body_type: str,
         wrap: str, 
         slot_ids: str, 
         slot_names: str, 
@@ -49,6 +108,8 @@ class TypeGeometry:
         slot_defaults: str
     ):
         self.type_id = type_id
+        self.type_name = type_name
+        self.body_type = body_type
         self.wrap = wrap
         self.slot_ids = slot_ids
         self.slot_names = slot_names
@@ -75,7 +136,7 @@ class DocumentElement:
         self.type_geometry = None  # Inicializáljuk None értékkel
 
         # Képek kezelése
-        if element_type == DocumentElementType.PICTURE:
+        if element_type.type_id == "PICTURE":
             self.handle_picture(content)
 
     def handle_picture(self, picture_path: str):
@@ -98,6 +159,18 @@ class DocumentElement:
         
         # A content mostantól a kép relatív elérési útja lesz
         self.content = os.path.join('pictures', dest_filename)
+
+    def to_csv_dict(self) -> Dict[str, Any]:
+        """Dokumentum elem konvertálása CSV formátumba"""
+        return {
+            'oid': self.oid,
+            'name': self.name,
+            'content': self.content,
+            'type': self.type.type_id if self.type else None,
+            'status': self.status.name if self.status else None,
+            'pid': self.pid,
+            'position': self.position
+        }
 
 class Document:
     def __init__(self, name: str):
@@ -166,17 +239,7 @@ class Document:
                 break
 
     def to_csv(self, filename: str):
-        data = []
-        for elem in self.elements:
-            data.append({
-                'oid': elem.oid,
-                'name': elem.name,
-                'content': elem.content,
-                'type': elem.type.name,
-                'status': elem.status.name,
-                'pid': elem.pid,
-                'position': elem.position
-            })
+        data = [elem.to_csv_dict() for elem in self.elements]
         df = pd.DataFrame(data)
         df.to_csv(filename, index=False)
 
@@ -199,7 +262,7 @@ class Document:
                 reader = csv.DictReader(csvfile)
                 for row in reader:
                     # Enum értékek konvertálása
-                    element_type = DocumentElementType[row['type']] if row['type'] else None
+                    element_type = DocumentElementType.get(row['type']) if row['type'] else None
                     element_status = DocumentElementStatus[row['status']] if row['status'] else None
                     
                     # Elem létrehozása
@@ -247,7 +310,7 @@ class Document:
             # Képek hozzáadása a zip fájlhoz
             pictures_dir = os.path.join(os.path.dirname(__file__), 'pictures')
             for elem in self.elements:
-                if elem.type == DocumentElementType.PICTURE:
+                if elem.type.type_id == "PICTURE":
                     pic_path = os.path.join(pictures_dir, os.path.basename(elem.content))
                     if os.path.exists(pic_path):
                         zipf.write(pic_path, arcname=os.path.join('pictures', os.path.basename(elem.content)))
@@ -266,7 +329,7 @@ if __name__ == "__main__":
     title_elem = DocumentElement(
         name="Főcím", 
         content="VanDoor Dokumentumkezelő", 
-        element_type=DocumentElementType.TITLE
+        element_type=DocumentElementType.get("TITLE")
     )
     doc.add_element(title_elem)
     
@@ -274,7 +337,7 @@ if __name__ == "__main__":
     text_elem = DocumentElement(
         name="Bevezető", 
         content="Ez egy példa dokumentum a VanDoor rendszerben.", 
-        element_type=DocumentElementType.TEXT
+        element_type=DocumentElementType.get("TEXT")
     )
     doc.add_element(text_elem)
     
@@ -283,7 +346,7 @@ if __name__ == "__main__":
         pic_elem = DocumentElement(
             name="Projekt Logo", 
             content="C:/Users/Vendel-Mohay István/CascadeProjects/VanDoor/logo.png", 
-            element_type=DocumentElementType.PICTURE
+            element_type=DocumentElementType.get("PICTURE")
         )
         doc.add_element(pic_elem)
     except Exception as e:

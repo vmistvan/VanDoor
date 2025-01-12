@@ -13,10 +13,16 @@
     "element_content": "Content",
     "element_types": {
         "TITLE": "Title",
+        "SUBTITLE": "Subtitle",
+        "SYNOPSIS": "Synopsis",
         "TEXT": "Text",
-        "PATH": "Path",
+        "BOLDTEXT": "Bold Text",
+        "PICTURE": "Picture",
+        "POSITION": "Position",
+        "TABLE": "Table",
         "PAGE": "Page",
-        "LINK": "Link"
+        "LINK": "Link",
+        "PATH": "Path"
     },
     "save_bookmark": "Save Bookmark",
     "load_bookmark": "Load Bookmark",
