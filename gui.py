@@ -343,6 +343,162 @@ class ElementEditorDialog(QDialog):
             self.doc_info['name']
         )
         
+class AddSubPage(QDialog):
+    """Új aloldal hozzáadása dialógus"""
+    def __init__(self, parent=None, doc_info=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.doc_info = doc_info
+        self.doc_manager = parent.doc_manager
+        
+        # Dialog beállítások
+        self.setWindowTitle(self.parent.config_manager.get_translation('add_subpage_title'))
+        
+        # Ablak méretének beállítása a szülő ablak 80%-ára
+        parent_rect = self.parent.rect()
+        dialog_width = int(parent_rect.width() * 0.8)
+        dialog_height = int(parent_rect.height() * 0.8)
+        self.resize(dialog_width, dialog_height)
+        
+        # Központi pozicionálás
+        self.move(
+            self.parent.mapToGlobal(parent_rect.center()) - 
+            self.rect().center()
+        )
+        
+        self.setModal(True)
+        
+        # Layout beállítások
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+        
+        # Név beviteli mező konténer
+        name_container = QHBoxLayout()
+        
+        # Név címke
+        name_label = QLabel(self.parent.config_manager.get_translation('new_page_name_label'))
+        name_label.setStyleSheet("font-size: 14px;")
+        name_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        name_container.addWidget(name_label)
+        
+        # Név beviteli mező
+        self.name_input = QLineEdit()
+        self.name_input.setObjectName("new_page_name")
+        name_container.addWidget(self.name_input)
+        
+        layout.addLayout(name_container)
+        
+        # Gombok konténer
+        button_container = QHBoxLayout()
+        button_container.setAlignment(Qt.AlignRight)
+        
+        # Mégse gomb
+        self.cancel_button = QPushButton(self.parent.config_manager.get_translation('cancel'))
+        self.cancel_button.clicked.connect(self.handle_cancel)
+        button_container.addWidget(self.cancel_button)
+        
+        # Hozzáad gomb
+        self.add_button = QPushButton(self.parent.config_manager.get_translation('add'))
+        self.add_button.clicked.connect(self.handle_add)
+        button_container.addWidget(self.add_button)
+        
+        layout.addLayout(button_container)
+        
+    def handle_cancel(self):
+        """Mégse gomb kezelése"""
+        self.reject()
+        # Oldal frissítése
+        self.parent.load_initial_document()
+        
+    def handle_add(self):
+        """Hozzáad gomb kezelése"""
+        try:
+            # Következő OID-k lekérése
+            config_manager = self.parent.config_manager
+            link_oid = config_manager.get_state('next_oid', '1')
+            page_oid = str(int(link_oid) + 1)
+            new_path_oid = str(int(page_oid) + 1)
+            
+            # next_oid növelése (eredeti + 3)
+            next_oid = str(int(link_oid) + 3)
+            config_manager.set_state('next_oid', next_oid)
+            
+            # Új oldal neve
+            new_page_name = self.name_input.text()
+            if not new_page_name:
+                return
+                
+            # Maximum pozíció meghatározása
+            max_path_pos = max([int(p['position']) for p in self.doc_info.get('path', []) if 'position' in p] or [0])
+            max_subpages_pos = max([int(p['position']) for p in self.doc_info.get('subpages', []) if 'position' in p] or [0])
+            new_position = max(max_path_pos, max_subpages_pos) + 1
+            
+            # Új subpage elem létrehozása
+            new_subpage = {
+                'oid': link_oid,
+                'name': f"PAGE{page_oid}",
+                'content': f"{page_oid}#>{new_page_name}",
+                'type': "PAGE",
+                'status': "NEW",
+                'pid': self.doc_info['oid'],
+                'position': str(new_position)
+            }
+            
+            # Subpages lista frissítése
+            if 'subpages' not in self.doc_info:
+                self.doc_info['subpages'] = []
+            self.doc_info['subpages'].append(new_subpage)
+            
+            # Dokumentum mentése
+            if self.doc_manager.write_document(self.doc_info):
+                # Új dokumentum létrehozása
+                new_doc_info = {
+                    'oid': page_oid,
+                    'name': f"doc{page_oid}",
+                    'elements': [{
+                        'oid': page_oid,
+                        'name': f"TITLE{page_oid}",
+                        'content': new_page_name,
+                        'type': "TITLE",
+                        'status': "NEW",
+                        'pid': self.doc_info['oid'],
+                        'position': "1"
+                    }],
+                    'subpages': [],
+                    'path': []
+                }
+                
+                # Path lista másolása és új elem hozzáadása
+                if 'path' in self.doc_info:
+                    new_doc_info['path'] = self.doc_info['path'].copy()
+                
+                # Új path elem hozzáadása
+                new_path = {
+                    'oid': new_path_oid,
+                    'name': f"PATH{page_oid}",
+                    'content': f"{page_oid}#>{new_page_name}",
+                    'type': "PATH",
+                    'status': "NEW",
+                    'pid': self.doc_info['oid'],
+                    'position': str(max_path_pos + 1)
+                }
+                new_doc_info['path'].append(new_path)
+                
+                # Új dokumentum mentése
+                if self.doc_manager.write_document(new_doc_info):
+                    self.accept()
+                    # Az eredeti dokumentum újratöltése a jelenlegi oldal adataival
+                    current_title = next((elem['content'] for elem in self.doc_info.get('elements', []) 
+                                if elem.get('type') == 'TITLE'), '')
+                    self.parent.load_initial_document(page=str(self.doc_info['oid']), title=current_title)
+                else:
+                    print("Hiba az új dokumentum mentése során")
+            else:
+                print("Hiba a dokumentum mentése során")
+                
+        except Exception as e:
+            print(f"Hiba az új aloldal létrehozása során: {e}")
+        
 class VanDoorMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -400,9 +556,6 @@ class VanDoorMainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # Fő elrendezés
-        main_layout = QVBoxLayout(central_widget)
-
         # Felső panel (max 20% magasság, min 100px)
         self.top_panel = QWidget()
         self.top_panel.setMinimumHeight(100)
@@ -427,8 +580,8 @@ class VanDoorMainWindow(QMainWindow):
         self.path_layout.setAlignment(Qt.AlignLeft)
         top_layout.addWidget(self.path_container)
         
-        main_layout.addWidget(self.top_panel)
-
+        main_layout = QVBoxLayout(central_widget)
+        
         # Dokumentum kezelő rész (fa nézet és szerkesztő)
         doc_layout = QHBoxLayout()
         
@@ -521,6 +674,7 @@ class VanDoorMainWindow(QMainWindow):
         bottom_layout.addWidget(self.language_combo)
         
         # Fő elrendezés összeállítása
+        main_layout.addWidget(self.top_panel)
         main_layout.addLayout(doc_layout)
         main_layout.addWidget(bottom_panel)
         
@@ -631,10 +785,12 @@ class VanDoorMainWindow(QMainWindow):
         self.element_editor.position = position
         if self.element_editor.exec_() == QDialog.Accepted:
             # Az aktuális oldal adataival töltjük újra
-            current_page = self.doc_info.get('oid', '1')
-            current_title = next((elem['content'] for elem in self.doc_info.get('elements', []) 
-                                if elem.get('type') == 'TITLE'), 'VanDoor Test Page')
-            self.load_initial_document(page=current_page, title=current_title)
+            current_doc = self.doc_manager.read_document(str(self.doc_info['oid']))
+            self.parent.doc_info = current_doc
+            # Aloldalak listájának frissítése
+            self.parent.subpages_listwidget.clear()
+            for subpage in current_doc.get('subpages', []):
+                self.parent.subpages_listwidget.addItem(f"{subpage['content']}")
         self.temporarily_disable_position(position, 'new')
 
     def handle_down_button_click(self, position):
@@ -732,7 +888,7 @@ class VanDoorMainWindow(QMainWindow):
         self.current_title = title
         
         # Dokumentum betöltése
-        self.doc_info = self.doc_manager.show_page(page, title)
+        self.doc_info = self.doc_manager.read_document(page)
         
         # Töröljük a régi elemeket
         self.elements_table.setRowCount(0)
@@ -994,24 +1150,21 @@ class VanDoorMainWindow(QMainWindow):
 
     def add_new_subpage(self):
         """Új aloldal hozzáadása"""
-        # TODO: Implementáld az új aloldal létrehozását
-        pass
-
+        if hasattr(self, 'subpage_dialog'):
+            self.subpage_dialog.close()
+        # Frissítsük a doc_info-t a legfrissebb állapottal
+        current_doc = self.doc_manager.read_document(str(self.doc_info['oid']))
+        self.subpage_dialog = AddSubPage(self, current_doc)
+        self.subpage_dialog.exec_()
+        
     def get_element_types(self):
         """Visszaadja a választható elem típusokat"""
         type_geometries = self.doc_manager.get_type_geometries()
-        print("\nget_element_types szűrése:")
         result = []
         for t, g in type_geometries.items():
-            print(f"\nVizsgált típus: {t.name}")
-            print(f"  body_type: {g.body_type}")
             stripped = g.body_type.strip('"')
-            print(f"  body_type stripped: {stripped}")
             if stripped == "YES":
-                print("  -> HOZZÁADJUK")
                 result.append((t, g.type_name))
-            else:
-                print("  -> NEM adjuk hozzá")
         return result
 
 def main():

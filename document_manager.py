@@ -235,13 +235,13 @@ class DocumentManager:
         # Normál elemek hozzáadása
         for elem in doc_info['elements']:
             elements_to_save.append({
-                'oid': int(elem.oid),  # oid számként
-                'name': elem.name,
-                'content': self.escape_content(elem.content),
-                'type': elem.type.type_id,
-                'status': elem.status.name,
-                'pid': elem.pid,
-                'position': int(elem.position)  # position számként
+                'oid': int(elem['oid']),  # oid számként
+                'name': elem['name'],
+                'content': self.escape_content(elem['content']),
+                'type': elem['type'],
+                'status': elem['status'],
+                'pid': elem['pid'],
+                'position': int(elem['position'])  # position számként
             })
             
         # PATH típusú elemek hozzáadása
@@ -255,7 +255,7 @@ class DocumentManager:
                     'type': path_elem['type'],
                     'status': path_elem['status'],
                     'pid': path_elem['pid'],
-                    'position': int(path_elem['position']) + 1  # position növelése
+                    'position': int(path_elem['position'])  # position számként
                 })
                 
         # PAGE típusú elemek hozzáadása
@@ -269,7 +269,7 @@ class DocumentManager:
                     'type': page_elem['type'],
                     'status': page_elem['status'],
                     'pid': page_elem['pid'],
-                    'position': int(page_elem['position']) + 1  # position növelése
+                    'position': int(page_elem['position'])  # position számként
                 })
 
         try:

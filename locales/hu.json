@@ -35,5 +35,7 @@
     "back": "Visszalépés",
     "add": "Hozzáadás",
     "select_type": "Válassza ki az elem típusát",
-    "file_upload": "Fájl feltöltése"
+    "file_upload": "Fájl feltöltése",
+    "add_subpage_title": "Új aloldal hozzáadása",
+    "new_page_name_label": "Új oldal neve:"
 }

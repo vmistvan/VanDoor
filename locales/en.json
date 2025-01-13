@@ -35,5 +35,7 @@
     "cancel": "Cancel",
     "add": "Add",
     "file_upload": "Choose File",
-    "select_type": "Choose element type:"
+    "select_type": "Choose element type:",
+    "add_subpage_title": "Add New Subpage",
+    "new_page_name_label": "New Page Name:"
 }
