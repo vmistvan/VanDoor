@@ -7,7 +7,9 @@ class DocumentManager:
         self.current_document = None
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.type_geometries = {}  # TypeGeometry objektumok cache-elése
+        self.list_elements = []    # Lista elemek tárolása
         self.load_type_geometries()  # Típusok betöltése inicializáláskor
+        self.load_list_elements()  # Lista elemek betöltése inicializáláskor
         
     def load_type_geometries(self):
         """TypeGeometry objektumok betöltése az elementtypes.csv fájlból"""
@@ -44,13 +46,11 @@ class DocumentManager:
         """TypeGeometry objektumok visszaadása"""
         return self.type_geometries
         
-    @staticmethod
-    def escape_content(content: str) -> str:
-        """Szöveg biztonságos formára alakítása tároláshoz"""
+    def escape_content(self, content):
+        """Speciális karakterek escape-elése"""
         if not content:
-            return ""
-        
-        # Speciális karakterek escape-elése
+            return content
+            
         replacements = {
             '\n': '\\n',    # Újsor
             '\r': '\\r',    # Kocsi vissza
@@ -62,33 +62,46 @@ class DocumentManager:
             "'": '&apos;',  # Aposztróf
         }
         
-        for old, new in replacements.items():
-            content = content.replace(old, new)
+        result = content
+        for original, escaped in replacements.items():
+            result = result.replace(original, escaped)
+        return result
         
-        return content
-        
-    @staticmethod
-    def unescape_content(content: str) -> str:
-        """Tárolt szöveg visszaalakítása megjelenítéshez"""
+    def unescape_content(self, content):
+        """Escape-elt karakterek visszaalakítása az eredeti formájukra"""
         if not content:
-            return ""
+            return content
             
-        # Speciális karakterek visszaalakítása
-        replacements = {
-            '\\n': '\n',    # Újsor
-            '\\r': '\r',    # Kocsi vissza
-            '\\t': '\t',    # Tab
+        # Először a HTML karaktereket alakítjuk vissza
+        html_replacements = {
             '&lt;': '<',    # HTML tag kezdete
             '&gt;': '>',    # HTML tag vége
             '&amp;': '&',   # HTML és karakter
             '&quot;': '"',  # Idézőjel
-            '&apos;': "'",  # Aposztróf
+            '&apos;': "'"   # Aposztróf
         }
         
-        for old, new in replacements.items():
-            content = content.replace(old, new)
+        result = content
+        for escaped, original in html_replacements.items():
+            result = result.replace(escaped, original)
             
-        return content
+        # Majd a speciális karaktereket alakítjuk vissza
+        special_chars = {
+            '\\n': '\n',    # Újsor
+            '\\r': '\r',    # Kocsi vissza
+            '\\t': '\t',    # Tab
+        }
+        
+        for escaped, original in special_chars.items():
+            result = result.replace(escaped, original)
+            
+        return result
+        
+    def get_document_element_content(self, element):
+        """Dokumentum elem tartalmának lekérése"""
+        if not element or not element.content:
+            return ""
+        return self.unescape_content(element.content)
         
     def show_element(self, element: DocumentElement) -> dict:
         """
@@ -109,7 +122,7 @@ class DocumentManager:
         return {
             'oid': element.oid,
             'name': element.name,
-            'content': DocumentManager.unescape_content(element.content),
+            'content': self.get_document_element_content(element),
             'type': element.type.name if element.type else None,  
             'status': element.status.name if element.status else None,  
             'pid': element.pid,
@@ -297,6 +310,36 @@ class DocumentManager:
         except Exception as e:
             print(f"Hiba a dokumentum mentése során: {e}")
             return False
+
+    def load_list_elements(self):
+        """Lista elemek betöltése a lists.csv fájlból"""
+        try:
+            csv_path = os.path.join(self.base_path, "lists.csv")
+            df = pd.read_csv(csv_path, dtype=str)  # Minden mezőt string típusként olvasunk
+            
+            # Lista elemek betöltése a DataFrame-ből
+            self.list_elements = []
+            for _, row in df.iterrows():
+                list_element = {
+                    'listname': row['listname'],
+                    'elementID': row['elementID'],
+                    'elementname': row['elementname'],
+                    'isdefelement': row['isdefelement']
+                }
+                self.list_elements.append(list_element)
+                
+        except Exception as e:
+            print(f"Hiba a lista elemek betöltése során: {e}")
+            self.list_elements = []
+            
+    def show_list(self, listname="HALIGN"):
+        """
+        Visszaadja a megadott listanévhez tartozó elemeket
+        
+        :param listname: A kért lista neve (alapértelmezett: "HALIGN")
+        :return: A listához tartozó elemek listája
+        """
+        return [elem for elem in self.list_elements if elem['listname'] == listname]
 
 # Példa használat
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
     QListWidgetItem, QLineEdit, QTextEdit, QSpinBox, QSizePolicy,
     QSpacerItem, QStackedWidget, QFileDialog, QTableWidget, 
     QTableWidgetItem, QHeaderView, QComboBox, QTreeWidget, 
-    QTreeWidgetItem, QGroupBox, QFrame
+    QTreeWidgetItem, QGroupBox, QFrame, QFormLayout
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont
@@ -81,16 +81,11 @@ class ElementEditorDialog(QDialog):
         type_geometries = self.doc_manager.get_type_geometries()
         
         for element_type, geometry in type_geometries.items():
-            
             stripped = geometry.body_type.strip('"')
             if stripped == "YES":
-                # print("  -> MEGJELENÍTJÜK")
                 item = QListWidgetItem(geometry.type_name)
                 item.setData(Qt.UserRole, element_type)  # Tároljuk az enum értéket
                 self.type_list.addItem(item)
-            else:
-                pass
-                # print("  -> NEM jelenítjük meg")
         
         # Lista méretének beállítása a tartalom alapján
         self.type_list.setFixedWidth(
@@ -100,15 +95,15 @@ class ElementEditorDialog(QDialog):
         layout.addLayout(type_container)
         
         # Mezők konténer
-        self.fields_container = QWidget()
-        self.fields_layout = QVBoxLayout()
-        self.fields_layout.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.fields_container.setLayout(self.fields_layout)
-        self.fields_container.hide()
+        fields_container = QWidget()
+        self.fields_layout = QFormLayout()  
+        fields_container.setLayout(self.fields_layout)
         
-        # A mezők konténer szélességének beállítása a dialog 90%-ára
-        self.fields_container.setMinimumWidth(int(dialog_width * 0.9))
-        layout.addWidget(self.fields_container)
+        # Görgetési terület a mezőkhöz
+        scroll = QScrollArea()
+        scroll.setWidget(fields_container)
+        scroll.setWidgetResizable(True)
+        layout.addWidget(scroll)
         
         # Gombok
         button_layout = QHBoxLayout()
@@ -137,79 +132,132 @@ class ElementEditorDialog(QDialog):
         layout.addLayout(button_layout)
         
         # Típus kiválasztás eseménykezelő
-        self.type_list.itemClicked.connect(self.on_type_selected)
+        self.type_list.itemClicked.connect(self.handle_type_selection)
         
     def show_fields(self):
         """Mezők megjelenítése"""
-        if not self.selected_type:
-            return
-            
         # UI elemek átváltása
         self.type_list.hide()
         self.next_button.hide()
-        self.fields_container.show()
+        self.fields_layout.parent().show()
         self.back_button.show()
         self.add_button.show()
         
-        # Mezők címke
+        # Címke hozzáadása
         fields_label = QLabel(self.parent.config_manager.get_translation('fill_element_data'))
         fields_label.setStyleSheet("font-size: 14px; font-weight: bold;")
         fields_label.setAlignment(Qt.AlignLeft)
-        self.fields_layout.addWidget(fields_label)
+        self.fields_layout.addRow(fields_label)
         
         # Típus geometria lekérése
         type_geometries = self.doc_manager.get_type_geometries()
-        type_geometry = type_geometries.get(DocumentElementType(self.selected_type))
+        geometry = type_geometries.get(self.selected_type)
         
-        if type_geometry:
-            # Slot ID-k és nevek szétválasztása
-            slot_ids = type_geometry.slot_ids.split('#>')
-            slot_names = type_geometry.slot_names.split('#>')
-            slot_types = type_geometry.slot_types.split('#>')
-            slot_defaults = type_geometry.slot_defaults.split('#>')
+        if geometry:
+            # Slot-ok feldolgozása
+            slot_ids = geometry.slot_ids.split('#>')
+            slot_names = geometry.slot_names.split('#>')
+            slot_types = geometry.slot_types.split('#>')
+            slot_defaults = geometry.slot_defaults.split('#>') if geometry.slot_defaults else []
             
-            # Mezők létrehozása
-            for i, (slot_id, slot_name, slot_type, slot_default) in enumerate(
-                zip(slot_ids, slot_names, slot_types, slot_defaults)
-            ):
+            # Ha ez egy létező elem szerkesztése
+            existing_values = {}
+            if hasattr(self, 'doc_info') and self.doc_info:
+                element = self.doc_info.get('element')
+                if element:
+                    # A content mező unescapelése
+                    content = self.doc_manager.unescape_content(element.content) if element.content else ""
+                    existing_values = {'content': content}
+            
+            # Mezők létrehozása minden slot-hoz
+            for i, (slot_id, slot_name, slot_type) in enumerate(zip(slot_ids, slot_names, slot_types)):
+                slot_default = slot_defaults[i] if i < len(slot_defaults) else ""
+                
+                # Ha van létező érték, azt használjuk alapértelmezettként
+                if slot_id in existing_values:
+                    slot_default = existing_values[slot_id]
+                
                 if slot_type != 'HIDDEN':
-                    # Címke hozzáadása
-                    label = QLabel(slot_name)
-                    self.fields_layout.addWidget(label)
-                    
-                    # Beviteli mező típus alapján
-                    if slot_type == 'TEXT':
-                        # Mindig többsoros szövegmező, 5 sor magassággal
-                        widget = QTextEdit()
-                        widget.setMinimumHeight(100)  # 5 sor magasság (kb. 20 pixel/sor)
-                        widget.setMaximumHeight(100)
-                        widget.setPlainText(slot_default)
-                    elif slot_type == 'FILE':
-                        # Fájl kiválasztó gomb
-                        widget = QPushButton(self.parent.config_manager.get_translation('file_upload'))
-                        widget.clicked.connect(
-                            lambda checked, slot_id=slot_id: self.select_file(slot_id)
-                        )
-                    elif slot_type == 'PAGEID':
-                        # Oldal azonosító választó
-                        widget = QSpinBox()
-                        widget.setMinimum(1)
-                        widget.setMaximum(9999)
-                        widget.setValue(int(slot_default) if slot_default.isdigit() else 1)
-                    else:
-                        # Alapértelmezett: egysoros szöveg
-                        widget = QLineEdit()
-                        widget.setText(slot_default)
+                    # Ellenőrizzük, hogy lista típusú-e a slot
+                    if slot_type.startswith('LIST'):
+                        # Lista típus feldolgozása
+                        list_parts = slot_type.split(':')
+                        list_name = list_parts[1] if len(list_parts) > 1 else "HALIGN"
                         
-                    self.fields_layout.addWidget(widget)
-                    self.field_widgets[slot_id] = widget
-                    
-                    # Térköz hozzáadása a mezők közé
-                    spacer = QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Fixed)
-                    self.fields_layout.addItem(spacer)
-                    
+                        # Lista elemek lekérése
+                        list_items = self.doc_manager.show_list(list_name)
+                        if not list_items:  # Ha üres a lista, próbáljuk az alapértelmezett listát
+                            list_items = self.doc_manager.show_list()
+                        
+                        # ComboBox létrehozása a lista elemekhez
+                        combo = QComboBox()
+                        for item in list_items:
+                            combo.addItem(item['elementname'], item['elementID'])
+                        
+                        # Alapértelmezett érték beállítása
+                        if slot_default:
+                            index = combo.findData(slot_default)
+                            if index >= 0:
+                                combo.setCurrentIndex(index)
+                        
+                        # Widget hozzáadása
+                        self.field_widgets[slot_id] = combo
+                        self.fields_layout.addRow(slot_name, combo)
+                    else:
+                        # Beviteli mező típus alapján
+                        if slot_type == 'TEXT':
+                            if '\n' in slot_default:
+                                widget = QTextEdit()
+                                widget.setPlainText(slot_default)
+                            else:
+                                widget = QLineEdit()
+                                widget.setText(slot_default)
+                        elif slot_type == 'INTEGER':
+                            widget = QSpinBox()
+                            widget.setMinimum(0)
+                            widget.setMaximum(100)
+                            if slot_default:
+                                widget.setValue(int(slot_default))
+                        elif slot_type == 'FILE':
+                            widget = QLineEdit()
+                            widget.setReadOnly(True)
+                            browse_button = QPushButton("Browse")
+                            browse_button.clicked.connect(
+                                lambda checked, w=widget: self.handle_file_browse(w)
+                            )
+                            container = QWidget()
+                            layout = QHBoxLayout(container)
+                            layout.addWidget(widget)
+                            layout.addWidget(browse_button)
+                            layout.setContentsMargins(0, 0, 0, 0)
+                            self.field_widgets[slot_id] = widget
+                            self.fields_layout.addRow(slot_name, container)
+                            continue  # Skip the default widget addition
+                        else:
+                            widget = QLineEdit()
+                            widget.setText(slot_default)
+                        
+                        # Widget hozzáadása
+                        self.field_widgets[slot_id] = widget
+                        self.fields_layout.addRow(slot_name, widget)
+        
         # Stretch hozzáadása
-        self.fields_layout.addStretch()
+        spacer_widget = QWidget()
+        spacer_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        spacer_widget.setMinimumHeight(40)
+        self.fields_layout.addRow("", spacer_widget)
+        
+    def handle_type_selection(self):
+        """Típus kiválasztás kezelése"""
+        current_item = self.type_list.currentItem()
+        if not current_item:
+            return
+            
+        # Kiválasztott típus lekérése
+        self.selected_type = current_item.data(Qt.UserRole)
+        
+        # Tovább gomb aktiválása
+        self.next_button.setEnabled(True)
         
     def showEvent(self, event):
         """Megjelenéskor középre pozicionálás"""
@@ -232,7 +280,7 @@ class ElementEditorDialog(QDialog):
         """Típus választó megjelenítése"""
         self.type_list.show()
         self.next_button.show()
-        self.fields_container.hide()
+        self.fields_layout.parent().hide()
         self.back_button.hide()
         self.add_button.hide()
         
@@ -262,6 +310,8 @@ class ElementEditorDialog(QDialog):
                 values[slot_id] = widget.text()
             elif isinstance(widget, QSpinBox):
                 values[slot_id] = str(widget.value())
+            elif isinstance(widget, QComboBox):
+                values[slot_id] = widget.currentData()
         
         # Config és State kezelése
         config_manager = self.parent.config_manager
@@ -720,7 +770,7 @@ class VanDoorMainWindow(QMainWindow):
 
     def update_button_states(self):
         """Gombok állapotának frissítése"""        
-        for up_button, new_button, down_button in self.element_buttons:
+        for up_button, new_button, down_button in self.element_buttons[:]:  # Másolaton iterálunk
             if up_button and up_button.parent() is not None:
                 position = str(up_button.position)  # Biztosítjuk, hogy string legyen
                 row = int(position) - 1
@@ -913,7 +963,7 @@ class VanDoorMainWindow(QMainWindow):
                 # Első oszlop: GroupBox
                 group_box = QGroupBox(f"{element['oid']}: {element['name']} ({element['type']})")
                 group_box_layout = QVBoxLayout(group_box)
-                content_label = QLabel(str(element['content']))
+                content_label = QLabel(self.doc_manager.unescape_content(str(element['content'])))  # Unescape-elés
                 content_label.setWordWrap(True)
                 
                 # Ha PATH típusú elem, akkor kattinthatóvá tesszük
@@ -947,7 +997,7 @@ class VanDoorMainWindow(QMainWindow):
         if self.doc_info and 'path' in self.doc_info:
             sorted_path = sorted(self.doc_info['path'], key=lambda x: x['position'])
             for i, path_element in enumerate(sorted_path):
-                content = path_element['content']
+                content = self.doc_manager.unescape_content(str(path_element['content']))  # Unescape-elés
                 page, title = content.split('#>')
                 label = ClickableLabel(title, content)
                 label.clicked.connect(self.handle_path_click)
@@ -962,7 +1012,7 @@ class VanDoorMainWindow(QMainWindow):
             for i in reversed(range(self.subpage_elements_layout.count())): 
                 self.subpage_elements_layout.itemAt(i).widget().setParent(None)
             for element in self.doc_info['subpages']:
-                content = element['content']
+                content = self.doc_manager.unescape_content(str(element['content']))  # Unescape-elés
                 page, title = content.split('#>')
                 label = ClickableLabel(title, content)
                 label.clicked.connect(self.handle_path_click)  # Ugyanazt a handlert használjuk

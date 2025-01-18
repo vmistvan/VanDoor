@@ -1,0 +1,4 @@
+listname,elementID,elementname,isdefelement
+HALIGN,1,"Left",1
+HALIGN,2,"Center",0
+HALIGN,3,"Right",0
