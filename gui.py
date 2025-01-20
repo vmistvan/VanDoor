@@ -178,68 +178,61 @@ class ElementEditorDialog(QDialog):
                     slot_default = existing_values[slot_id]
                 
                 if slot_type != 'HIDDEN':
-                    # Ellenőrizzük, hogy lista típusú-e a slot
-                    if slot_type.startswith('LIST'):
+                    # Beviteli mező típus alapján
+                    if slot_type == 'TEXT':
+                        widget = QTextEdit()
+                        widget.setMinimumHeight(200)  # 8 sor magasság (kb. 25 pixel/sor)
+                        widget.setPlainText(slot_default)
+                    elif slot_type.startswith('LIST'):
                         # Lista típus feldolgozása
                         list_parts = slot_type.split(':')
                         list_name = list_parts[1] if len(list_parts) > 1 else "HALIGN"
                         
                         # Lista elemek lekérése
-                        list_items = self.doc_manager.show_list(list_name)
-                        if not list_items:  # Ha üres a lista, próbáljuk az alapértelmezett listát
+                        list_items = []
+                        if list_name:
+                            list_items = self.doc_manager.show_list(list_name)
+                        if not list_items:  # Ha üres a lista vagy nincs lista név, az alapértelmezett listát használjuk
                             list_items = self.doc_manager.show_list()
                         
                         # ComboBox létrehozása a lista elemekhez
-                        combo = QComboBox()
+                        widget = QComboBox()
                         for item in list_items:
-                            combo.addItem(item['elementname'], item['elementID'])
+                            widget.addItem(item['elementname'], item['elementID'])
                         
                         # Alapértelmezett érték beállítása
                         if slot_default:
-                            index = combo.findData(slot_default)
+                            index = widget.findData(slot_default)
                             if index >= 0:
-                                combo.setCurrentIndex(index)
-                        
-                        # Widget hozzáadása
-                        self.field_widgets[slot_id] = combo
-                        self.fields_layout.addRow(slot_name, combo)
-                    else:
-                        # Beviteli mező típus alapján
-                        if slot_type == 'TEXT':
-                            if '\n' in slot_default:
-                                widget = QTextEdit()
-                                widget.setPlainText(slot_default)
-                            else:
-                                widget = QLineEdit()
-                                widget.setText(slot_default)
-                        elif slot_type == 'INTEGER':
-                            widget = QSpinBox()
-                            widget.setMinimum(0)
-                            widget.setMaximum(100)
-                            if slot_default:
-                                widget.setValue(int(slot_default))
-                        elif slot_type == 'FILE':
-                            widget = QLineEdit()
-                            widget.setReadOnly(True)
-                            browse_button = QPushButton("Browse")
-                            browse_button.clicked.connect(
-                                lambda checked, w=widget: self.handle_file_browse(w)
-                            )
-                            container = QWidget()
-                            layout = QHBoxLayout(container)
-                            layout.addWidget(widget)
-                            layout.addWidget(browse_button)
-                            layout.setContentsMargins(0, 0, 0, 0)
-                            self.field_widgets[slot_id] = widget
-                            self.fields_layout.addRow(slot_name, container)
-                            continue  # Skip the default widget addition
-                        else:
-                            widget = QLineEdit()
-                            widget.setText(slot_default)
-                        
-                        # Widget hozzáadása
+                                widget.setCurrentIndex(index)
+                    elif slot_type == 'INTEGER':
+                        widget = QSpinBox()
+                        widget.setMinimum(0)
+                        widget.setMaximum(100)
+                        if slot_default:
+                            widget.setValue(int(slot_default))
+                    elif slot_type == 'FILE':
+                        widget = QLineEdit()
+                        widget.setReadOnly(True)
+                        browse_button = QPushButton("Browse")
+                        browse_button.clicked.connect(
+                            lambda checked, w=widget: self.handle_file_browse(w)
+                        )
+                        container = QWidget()
+                        layout = QHBoxLayout(container)
+                        layout.addWidget(widget)
+                        layout.addWidget(browse_button)
+                        layout.setContentsMargins(0, 0, 0, 0)
                         self.field_widgets[slot_id] = widget
-                        self.fields_layout.addRow(slot_name, widget)
+                        self.fields_layout.addRow(slot_name, container)
+                        continue  # Skip the default widget addition
+                    else:
+                        widget = QLineEdit()
+                        widget.setText(slot_default)
+                    
+                    # Widget hozzáadása
+                    self.field_widgets[slot_id] = widget
+                    self.fields_layout.addRow(slot_name, widget)
         
         # Stretch hozzáadása
         spacer_widget = QWidget()
@@ -836,11 +829,15 @@ class VanDoorMainWindow(QMainWindow):
         if self.element_editor.exec_() == QDialog.Accepted:
             # Az aktuális oldal adataival töltjük újra
             current_doc = self.doc_manager.read_document(str(self.doc_info['oid']))
-            self.parent.doc_info = current_doc
+            self.doc_info = current_doc
             # Aloldalak listájának frissítése
-            self.parent.subpages_listwidget.clear()
+            for i in reversed(range(self.subpage_elements_layout.count())): 
+                self.subpage_elements_layout.itemAt(i).widget().setParent(None)
             for subpage in current_doc.get('subpages', []):
-                self.parent.subpages_listwidget.addItem(f"{subpage['content']}")
+                page, title = subpage['content'].split('#>')
+                label = ClickableLabel(title, subpage['content'])
+                label.clicked.connect(self.handle_path_click)
+                self.subpage_elements_layout.addWidget(label)
         self.temporarily_disable_position(position, 'new')
 
     def handle_down_button_click(self, position):
@@ -1011,8 +1008,8 @@ class VanDoorMainWindow(QMainWindow):
         if self.doc_info and 'subpages' in self.doc_info:
             for i in reversed(range(self.subpage_elements_layout.count())): 
                 self.subpage_elements_layout.itemAt(i).widget().setParent(None)
-            for element in self.doc_info['subpages']:
-                content = self.doc_manager.unescape_content(str(element['content']))  # Unescape-elés
+            for subpage in self.doc_info['subpages']:
+                content = self.doc_manager.unescape_content(str(subpage['content']))  # Unescape-elés
                 page, title = content.split('#>')
                 label = ClickableLabel(title, content)
                 label.clicked.connect(self.handle_path_click)  # Ugyanazt a handlert használjuk

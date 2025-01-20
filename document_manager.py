@@ -247,15 +247,27 @@ class DocumentManager:
         
         # Normál elemek hozzáadása
         for elem in doc_info['elements']:
-            elements_to_save.append({
-                'oid': int(elem['oid']),  # oid számként
-                'name': elem['name'],
-                'content': self.escape_content(elem['content']),
-                'type': elem['type'],
-                'status': elem['status'],
-                'pid': elem['pid'],
-                'position': int(elem['position'])  # position számként
-            })
+            # Ha DocumentElement objektum, akkor annak attribútumait használjuk
+            if isinstance(elem, DocumentElement):
+                elements_to_save.append({
+                    'oid': int(elem.oid),  # oid számként
+                    'name': elem.name,
+                    'content': self.escape_content(elem.content),
+                    'type': elem.type.name if elem.type else None,
+                    'status': elem.status.name if elem.status else None,
+                    'pid': elem.pid,
+                    'position': int(elem.position)  # position számként
+                })
+            else:  # Ha szótár, akkor azt használjuk
+                elements_to_save.append({
+                    'oid': int(elem['oid']),  # oid számként
+                    'name': elem['name'],
+                    'content': self.escape_content(elem['content']),
+                    'type': elem['type'],
+                    'status': elem['status'],
+                    'pid': elem['pid'],
+                    'position': int(elem['position'])  # position számként
+                })
             
         # PATH típusú elemek hozzáadása
         if 'path' in doc_info and doc_info['path']:
