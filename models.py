@@ -6,6 +6,8 @@ import os
 import shutil
 import zipfile
 from datetime import datetime
+from PyQt5.QtWidgets import QLabel, QWidget, QSizePolicy
+from PyQt5.QtCore import Qt
 
 class DocumentElementType:
     """Dokumentum elem típusok.
@@ -319,6 +321,59 @@ class Document:
             os.remove(csv_path)
         
         return zip_path
+
+class ShowActiveElement:
+    """Aktív elemek megjelenítésének kezelése"""
+    
+    @staticmethod
+    def create_signature_widget(content: str, doc_manager) -> QLabel:
+        """SIGNATURE típusú elem widget létrehozása"""
+        # Content feldolgozása
+        parts = content.split('#>')
+        halign = parts[0].strip("'") if len(parts) > 0 else ""  # Idézőjelek eltávolítása
+        textcontent = parts[1] if len(parts) > 1 else ""
+        
+        # Horizontális igazítás keresése
+        halign_item = None
+        list_items = doc_manager.show_list("HALIGN")
+        
+        # Keresés a megadott halign értékkel
+        for item in list_items:
+            if item['elementID'] == halign:
+                halign_item = item
+                break
+        
+        # Ha nincs találat, keressük az alapértelmezett elemet
+        if not halign_item:
+            for item in list_items:
+                if item.get('isdefelement') == '1':
+                    halign_item = item
+                    break
+        
+        # Label létrehozása
+        label = QLabel(textcontent)
+        label.setWordWrap(True)
+        label.setStyleSheet("margin: 5px; padding: 5px; width: 100%;")
+        label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        
+        # Horizontális igazítás beállítása
+        if halign_item:
+            if halign_item['elementname'] == 'Left':
+                label.setAlignment(Qt.AlignLeft)
+                
+            elif halign_item['elementname'] == 'Center':
+                label.setAlignment(Qt.AlignCenter)
+            elif halign_item['elementname'] == 'Right':
+                label.setAlignment(Qt.AlignRight)
+        
+        return label
+        
+    @staticmethod
+    def create_widget(element_type: str, content: str, doc_manager) -> QWidget:
+        """Widget létrehozása az elem típusa alapján"""
+        if element_type == 'SIGNATURE':
+            return ShowActiveElement.create_signature_widget(content, doc_manager)
+        return None
 
 # Példakód az export_to_zip metódus használatára
 if __name__ == "__main__":

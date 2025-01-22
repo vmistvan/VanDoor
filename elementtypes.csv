@@ -1,13 +1,13 @@
-type_id,type_name,body_type,wrap,slot_ids,slot_names,slot_types,slot_defaults
-TITLE,"TITLE","NO","<H1>#></H1>","TITLE","Title Text","TEXT",""
-SUBTITLE,"SUBTITLE","YES","<H2>#></H2>","SUBTITLE","Subtitle Text","TEXT",""
-SYNOPSIS,"SYNOPSIS","YES","<B>#></B>","SYNOPSIS","Synopsis Text","TEXT",""
-TEXT,"TEXT","YES","<P>#></P>","TEXT","Text Content","TEXT",""
-SIGNATURE,"SIGNATURE","YES","<P ALIGN='#>'>#></P>","HALIGN#>TEXT","Alignment#>Text Content","LIST:HALIGN#>TEXT","1#>"
-BOLDTEXT,"BOLDTEXT","YES","<B>#></B>","BOLDTEXT","Bold Text Content","TEXT",""
-PICTURE,"PICTURE","YES","<IMG SRC='pic#.>'></IMG>","PICID#>FILE#>PICNAME#>PICTYPE","Picture ID#>Picture File#>Picture Name#>Picture Type","HIDDEN#>FILE#>TEXT#>TEXT",""
-POSITION,"POSITION","YES","<B>#><BR>#> - #></B>","NAME#>LATITUDE#>LONGITUDE","Position Name#>Latitude#>Longitude","TEXT#>TEXT#>TEXT",""
-TABLE,"TABLE","YES","<TABLE>#></TABLE>","ROW#>COLUMN","Row Number#>Column Number","INTEGER#>INTEGER","1#>1"
-PAGE,"PAGE","NO","<P><A HREF='#'>#</A></P>","PAGEID#>PAGETITLE","Page ID#>Page Title","HIDDEN#>TEXT",""
-LINK,"LINK","YES","<A HREF='doc#>.csv'>#</A>","PAGEID#>LINKTEXT","Page#>Link Text","PAGEID#>TEXT",""
-PATH,"PATH","NO","<A HREF='doc#>.csv'>#</A>","PAGEID#>TITLE","Page#>Title Text","HIDDEN#>HIDDEN",""
+type_id,type_name,body_type,wrap,slot_ids,slot_names,slot_types,slot_defaults,isactive
+TITLE,"TITLE","NO","<H1>#></H1>","TITLE","Title Text","TEXT","",0
+SUBTITLE,"SUBTITLE","YES","<H2>#></H2>","SUBTITLE","Subtitle Text","TEXT","",0
+SYNOPSIS,"SYNOPSIS","YES","<B>#></B>","SYNOPSIS","Synopsis Text","TEXT","",0
+TEXT,"TEXT","YES","<P>#></P>","TEXT","Text Content","TEXT","",0
+SIGNATURE,"SIGNATURE","YES","<P ALIGN='#>'>#></P>","HALIGN#>TEXT","Alignment#>Text Content","LIST:HALIGN#>TEXT","1#>",1
+BOLDTEXT,"BOLDTEXT","YES","<B>#></B>","BOLDTEXT","Bold Text Content","TEXT","",0
+PICTURE,"PICTURE","YES","<IMG SRC='pic#.>'></IMG>","PICID#>FILE#>PICNAME#>PICTYPE","Picture ID#>Picture File#>Picture Name#>Picture Type","HIDDEN#>FILE#>TEXT#>TEXT","",0
+POSITION,"POSITION","YES","<B>#><BR>#> - #></B>","NAME#>LATITUDE#>LONGITUDE","Position Name#>Latitude#>Longitude","TEXT#>TEXT#>TEXT","",0
+TABLE,"TABLE","YES","<TABLE>#></TABLE>","ROW#>COLUMN","Row Number#>Column Number","INTEGER#>INTEGER","1#>1",0
+PAGE,"PAGE","NO","<P><A HREF='#'>#</A></P>","PAGEID#>PAGETITLE","Page ID#>Page Title","HIDDEN#>TEXT","",0
+LINK,"LINK","YES","<A HREF='doc#>.csv'>#</A>","PAGEID#>LINKTEXT","Page#>Link Text","PAGEID#>TEXT","",0
+PATH,"PATH","NO","<A HREF='doc#>.csv'>#</A>","PAGEID#>TITLE","Page#>Title Text","HIDDEN#>HIDDEN","",0

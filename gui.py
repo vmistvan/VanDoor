@@ -6,19 +6,18 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QScrollArea, QDialog, QListWidget,
-    QListWidgetItem, QLineEdit, QTextEdit, QSpinBox, QSizePolicy,
-    QSpacerItem, QStackedWidget, QFileDialog, QTableWidget, 
-    QTableWidgetItem, QHeaderView, QComboBox, QTreeWidget, 
-    QTreeWidgetItem, QGroupBox, QFrame, QFormLayout
-)
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer
+    QPushButton, QLabel, QScrollArea, QTableWidget, QTableWidgetItem,
+    QDialog, QFormLayout, QLineEdit, QSpinBox, QComboBox, QListWidget,
+    QListWidgetItem, QGroupBox, QGridLayout, QFileDialog, QTextEdit,
+    QSizePolicy, QSpacerItem, QStackedWidget, QHeaderView, QTreeWidget, 
+    QTreeWidgetItem, QGroupBox, QFrame
+    )
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QFont
-
 from document_manager import DocumentManager
-from models import DocumentElement, DocumentElementType, DocumentElementStatus
 from config_manager import ConfigManager
 from translations import Translator
+from models import ShowActiveElement, DocumentElement, DocumentElementType, DocumentElementStatus
 
 class ClickableLabel(QLabel):
     clicked = pyqtSignal(str)  # Signal a kattintás eseményhez
@@ -960,15 +959,19 @@ class VanDoorMainWindow(QMainWindow):
                 # Első oszlop: GroupBox
                 group_box = QGroupBox(f"{element['oid']}: {element['name']} ({element['type']})")
                 group_box_layout = QVBoxLayout(group_box)
-                content_label = QLabel(self.doc_manager.unescape_content(str(element['content'])))  # Unescape-elés
-                content_label.setWordWrap(True)
                 
-                # Ha PATH típusú elem, akkor kattinthatóvá tesszük
-                if element['type'] == 'PATH':
-                    clickable_label = ClickableLabel(str(element['content']), str(element['content']))
-                    clickable_label.clicked.connect(self.handle_path_click)
-                    group_box_layout.addWidget(clickable_label)
+                # Content megjelenítése az isactive flag alapján
+                if element.get('isactive', True) and element['type'] == 'SIGNATURE':
+                    content_widget = ShowActiveElement.create_widget(
+                        element['type'],
+                        self.doc_manager.unescape_content(str(element['content'])),
+                        self.doc_manager
+                    )
+                    if content_widget:
+                        group_box_layout.addWidget(content_widget)
                 else:
+                    content_label = QLabel(self.doc_manager.unescape_content(str(element['content'])))
+                    content_label.setWordWrap(True)
                     group_box_layout.addWidget(content_label)
                 
                 self.elements_table.setCellWidget(row, 0, group_box)
