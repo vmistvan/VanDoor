@@ -958,6 +958,18 @@ class VanDoorMainWindow(QMainWindow):
                 
                 # Első oszlop: GroupBox
                 group_box = QGroupBox(f"{element['oid']}: {element['name']} ({element['type']})")
+                
+                # Háttérszín beállítása status alapján
+                status_colors = {
+                    'NEW': '#dddddd',  # szürke
+                    'EDIT': '#ffffd0',  # halványsárga
+                    'DEL': '#ffd0d0',   # halványpiros
+                    'PUB': '#d0d0ff',   # halványkék
+                    'PRE': '#d0ffd0'    # halványzöld
+                }
+                bg_color = status_colors.get(element['status'], '#ffffff')  # alapértelmezett: fehér
+                group_box.setStyleSheet(f"QGroupBox {{ background-color: {bg_color}; }}")
+                
                 group_box_layout = QVBoxLayout(group_box)
                 
                 # Content megjelenítése az isactive flag alapján
