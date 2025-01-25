@@ -2,15 +2,21 @@
     "window_title": "VanDoor Document Manager",
     "documents": "Documents",
     "new_element": "New Element",
-    "move_up": "Move Up",
+    "move_up": "Up",
     "new_subpage": "New Subpage",
-    "move_down": "Move Down",
+    "move_down": "Down",
     "path": "Path",
     "subpages": "Subpages",
     "elements": "Elements",
     "element_name": "Name",
     "element_type": "Type",
     "element_content": "Content",
+    "context_menu": {
+        "edit": "Edit",
+        "pre_publish": "Pre Publish",
+        "delete": "Delete",
+        "undelete": "Undelete"
+    },
     "element_types": {
         "TITLE": "Title",
         "SUBTITLE": "Subtitle",

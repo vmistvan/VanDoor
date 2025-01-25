@@ -636,8 +636,8 @@ class ElementContextMenu:
                     
         # Dokumentum mentése
         self.doc_manager.write_document(self.parent.doc_info)
-        # Dokumentum újratöltése
-        self.parent.load_initial_document(self.parent.doc_info)
+        # Csak az oid-t adjuk át
+        self.parent.load_initial_document(str(self.parent.doc_info['oid']))
 
 class VanDoorMainWindow(QMainWindow):
     """VanDoor főablak"""

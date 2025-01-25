@@ -11,6 +11,12 @@
     "element_name": "Név",
     "element_type": "Típus",
     "element_content": "Tartalom",
+    "context_menu": {
+        "edit": "Szerkesztés",
+        "pre_publish": "Publikálás előkésztés",
+        "delete": "Törlés",
+        "undelete": "Törlés visszavonása"
+    },
     "element_types": {
         "TITLE": "Cím",
         "SUBTITLE": "Alcím",
