@@ -29,7 +29,8 @@ class DocumentManager:
                     slot_ids=row['slot_ids'],
                     slot_names=row['slot_names'],
                     slot_types=row['slot_types'],
-                    slot_defaults=row['slot_defaults'] if pd.notna(row['slot_defaults']) else ""
+                    slot_defaults=row['slot_defaults'] if pd.notna(row['slot_defaults']) else "",
+                    isactive=str(row['isactive']) if pd.notna(row['isactive']) else "0"
                 )
                 # Megfelelő DocumentElementType objektum lekérése vagy létrehozása
                 element_type = DocumentElementType.get(type_id)
@@ -217,6 +218,15 @@ class DocumentManager:
             for _, row in df.iterrows():
                 element_dict = row.to_dict()
                 
+                # Ellenőrizzük, hogy aktív típus-e
+                element_type = DocumentElementType.get(element_dict['type'])
+                type_geometry = self.type_geometries.get(element_type)
+                is_active = type_geometry and type_geometry.isactive == '1'
+                
+                # Csak akkor unescape-eljük, ha nem aktív típus
+                if not is_active:
+                    element_dict['content'] = self.unescape_content(element_dict['content'])
+                
                 # PATH és PAGE típusú elemek külön kezelése
                 if element_dict['type'] == 'PATH':
                     doc_info['path'].append(element_dict)
@@ -249,26 +259,34 @@ class DocumentManager:
         for elem in doc_info['elements']:
             # Ha DocumentElement objektum, akkor annak attribútumait használjuk
             if isinstance(elem, DocumentElement):
+                # Ellenőrizzük, hogy aktív típus-e
+                type_geometry = self.type_geometries.get(elem.type)
+                is_active = type_geometry and type_geometry.isactive == '1'
                 elements_to_save.append({
                     'oid': int(elem.oid),  # oid számként
                     'name': elem.name,
-                    'content': self.escape_content(elem.content),
+                    'content': elem.content if is_active else self.escape_content(elem.content),
                     'type': elem.type.name if elem.type else None,
                     'status': elem.status.name if elem.status else None,
                     'pid': elem.pid,
                     'position': int(elem.position)  # position számként
                 })
             else:  # Ha szótár, akkor azt használjuk
-                elements_to_save.append({
+                # Ellenőrizzük, hogy aktív típus-e
+                element_type = DocumentElementType.get(elem['type'])
+                type_geometry = self.type_geometries.get(element_type)
+                is_active = type_geometry and type_geometry.isactive == '1'
+                element_dict = {
                     'oid': int(elem['oid']),  # oid számként
                     'name': elem['name'],
-                    'content': self.escape_content(elem['content']),
+                    'content': elem['content'] if is_active else self.escape_content(elem['content']),
                     'type': elem['type'],
                     'status': elem['status'],
                     'pid': elem['pid'],
                     'position': int(elem['position'])  # position számként
-                })
-            
+                }
+                elements_to_save.append(element_dict)
+                
         # PATH típusú elemek hozzáadása
         if 'path' in doc_info and doc_info['path']:
             for path_elem in doc_info['path']:

@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
     QDialog, QFormLayout, QLineEdit, QSpinBox, QComboBox, QListWidget,
     QListWidgetItem, QGroupBox, QGridLayout, QFileDialog, QTextEdit,
     QSizePolicy, QSpacerItem, QStackedWidget, QHeaderView, QTreeWidget, 
-    QTreeWidgetItem, QGroupBox, QFrame
+    QTreeWidgetItem, QGroupBox, QFrame, QMenu
     )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QFont
@@ -22,15 +22,41 @@ from models import ShowActiveElement, DocumentElement, DocumentElementType, Docu
 class ClickableLabel(QLabel):
     clicked = pyqtSignal(str)  # Signal a kattintás eseményhez
 
-    def __init__(self, text, content):
+    def __init__(self, text, content, element=None, parent=None, doc_manager=None):
         super().__init__(text)
         self.content = content
+        self.element = element
+        self.parent = parent
+        self.doc_manager = doc_manager
         self.setCursor(Qt.PointingHandCursor)
         self.setStyleSheet("color: blue; text-decoration: none;")
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.clicked.emit(self.content)
+        elif event.button() == Qt.RightButton and self.element:
+            context_menu = ElementContextMenu(self.parent, self.element, self.doc_manager, called_from='subpages')
+            menu = context_menu.create_menu(event)
+            menu.exec_(event.globalPos())
+
+    def contextMenuEvent(self, event):
+        context_menu = ElementContextMenu(self.parent, self.element, self.doc_manager, called_from='subpages')
+        menu = context_menu.create_menu(event)
+        menu.exec_(event.globalPos())
+
+class ElementGroupBox(QGroupBox):
+    """Elem megjelenítő doboz kontextus menüvel"""
+    
+    def __init__(self, title, parent, element, doc_manager):
+        super().__init__(title)
+        self.parent = parent
+        self.element = element
+        self.doc_manager = doc_manager
+        
+    def contextMenuEvent(self, event):
+        context_menu = ElementContextMenu(self.parent, self.element, self.doc_manager)
+        menu = context_menu.create_menu(event)
+        menu.exec_(event.globalPos())
 
 class ElementEditorDialog(QDialog):
     def __init__(self, parent=None, doc_info=None):
@@ -541,6 +567,78 @@ class AddSubPage(QDialog):
         except Exception as e:
             print(f"Hiba az új aloldal létrehozása során: {e}")
         
+class ElementContextMenu:
+    """Elem kontextus menü kezelése"""
+    
+    def __init__(self, parent, element, doc_manager, called_from='elements'):
+        self.parent = parent
+        self.element = element
+        self.doc_manager = doc_manager
+        self.called_from = called_from  # 'elements' vagy 'subpages'
+        
+    def create_menu(self, event):
+        """Kontextus menü létrehozása"""
+        menu = QMenu(self.parent)
+        
+        status = self.element['status']
+        if status in ['NEW', 'EDIT']:
+            # Edit menüpont
+            edit_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.edit'))
+            edit_action.triggered.connect(self.handle_edit)
+            
+            # Pre publish menüpont
+            pre_pub_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.pre_publish'))
+            pre_pub_action.triggered.connect(self.handle_pre_publish)
+            
+            # Delete menüpont
+            delete_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.delete'))
+            delete_action.triggered.connect(self.handle_delete)
+            
+        elif status == 'DEL':
+            # Undelete menüpont
+            undelete_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.undelete'))
+            undelete_action.triggered.connect(self.handle_undelete)
+        
+        return menu
+    
+    def handle_edit(self):
+        """Edit menüpont kezelése"""
+        print("Editálás")
+    
+    def handle_pre_publish(self):
+        """Pre publish menüpont kezelése"""
+        self.element['status'] = 'PRE'
+        self.save_and_refresh()
+    
+    def handle_delete(self):
+        """Delete menüpont kezelése"""
+        self.element['status'] = 'DEL'
+        self.save_and_refresh()
+    
+    def handle_undelete(self):
+        """Undelete menüpont kezelése"""
+        self.element['status'] = 'EDIT'
+        self.save_and_refresh()
+    
+    def save_and_refresh(self):
+        """Dokumentum mentése és újratöltése"""
+        # Az elem státuszának módosítása a megfelelő listában
+        if self.called_from == 'elements':
+            for element in self.parent.doc_info['elements']:
+                if element['oid'] == self.element['oid']:
+                    element['status'] = self.element['status']
+                    break
+        elif self.called_from == 'subpages':
+            for subpage in self.parent.doc_info['subpages']:
+                if subpage['oid'] == self.element['oid']:
+                    subpage['status'] = self.element['status']
+                    break
+                    
+        # Dokumentum mentése
+        self.doc_manager.write_document(self.parent.doc_info)
+        # Dokumentum újratöltése
+        self.parent.load_initial_document(self.parent.doc_info)
+
 class VanDoorMainWindow(QMainWindow):
     """VanDoor főablak"""
     
@@ -846,8 +944,8 @@ class VanDoorMainWindow(QMainWindow):
             for subpage in current_doc.get('subpages', []):
                 content = self.doc_manager.unescape_content(str(subpage['content']))  # Unescape-elés
                 page, title = content.split('#>')
-                label = ClickableLabel(title, content)
-                label.clicked.connect(self.handle_path_click)
+                label = ClickableLabel(title, content, subpage, self, self.doc_manager)
+                label.clicked.connect(self.handle_path_click)  # Ugyanazt a handlert használjuk
                 # Háttérszín beállítása status alapján
                 bg_color = self.STATUS_COLORS.get(subpage['status'], '#ffffff')  # alapértelmezett: fehér
                 label.setStyleSheet(f"background-color: {bg_color};")
@@ -972,7 +1070,7 @@ class VanDoorMainWindow(QMainWindow):
                     title_found = True
                 
                 # Első oszlop: GroupBox
-                group_box = QGroupBox(f"{element['oid']}: {element['name']} ({element['type']})")
+                group_box = ElementGroupBox(f"{element['oid']}: {element['name']} ({element['type']})", self, element, self.doc_manager)
                 
                 # Háttérszín beállítása status alapján
                 bg_color = self.STATUS_COLORS.get(element['status'], '#ffffff')  # alapértelmezett: fehér
@@ -1034,7 +1132,7 @@ class VanDoorMainWindow(QMainWindow):
             for subpage in self.doc_info['subpages']:
                 content = self.doc_manager.unescape_content(str(subpage['content']))  # Unescape-elés
                 page, title = content.split('#>')
-                label = ClickableLabel(title, content)
+                label = ClickableLabel(title, content, subpage, self, self.doc_manager)
                 label.clicked.connect(self.handle_path_click)  # Ugyanazt a handlert használjuk
                 # Háttérszín beállítása status alapján
                 bg_color = self.STATUS_COLORS.get(subpage['status'], '#ffffff')  # alapértelmezett: fehér

@@ -107,7 +107,8 @@ class TypeGeometry:
         slot_ids: str, 
         slot_names: str, 
         slot_types: str,
-        slot_defaults: str
+        slot_defaults: str,
+        isactive: str = "0"
     ):
         self.type_id = type_id
         self.type_name = type_name
@@ -117,6 +118,7 @@ class TypeGeometry:
         self.slot_names = slot_names
         self.slot_types = slot_types
         self.slot_defaults = slot_defaults
+        self.isactive = isactive
 
 class DocumentElement:
     def __init__(
