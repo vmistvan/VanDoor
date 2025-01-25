@@ -542,6 +542,17 @@ class AddSubPage(QDialog):
             print(f"Hiba az új aloldal létrehozása során: {e}")
         
 class VanDoorMainWindow(QMainWindow):
+    """VanDoor főablak"""
+    
+    # Státusz színek
+    STATUS_COLORS = {
+        'NEW': '#dddddd',  # szürke
+        'EDIT': '#ffffd0',  # halványsárga
+        'DEL': '#ffd0d0',   # halványpiros
+        'PUBLIC': '#d0d0ff',   # halványkék
+        'PRE': '#d0ffd0'    # halványzöld
+    }
+    
     def __init__(self):
         super().__init__()
         self.config_manager = ConfigManager()
@@ -833,9 +844,13 @@ class VanDoorMainWindow(QMainWindow):
             for i in reversed(range(self.subpage_elements_layout.count())): 
                 self.subpage_elements_layout.itemAt(i).widget().setParent(None)
             for subpage in current_doc.get('subpages', []):
-                page, title = subpage['content'].split('#>')
-                label = ClickableLabel(title, subpage['content'])
+                content = self.doc_manager.unescape_content(str(subpage['content']))  # Unescape-elés
+                page, title = content.split('#>')
+                label = ClickableLabel(title, content)
                 label.clicked.connect(self.handle_path_click)
+                # Háttérszín beállítása status alapján
+                bg_color = self.STATUS_COLORS.get(subpage['status'], '#ffffff')  # alapértelmezett: fehér
+                label.setStyleSheet(f"background-color: {bg_color};")
                 self.subpage_elements_layout.addWidget(label)
         self.temporarily_disable_position(position, 'new')
 
@@ -960,14 +975,7 @@ class VanDoorMainWindow(QMainWindow):
                 group_box = QGroupBox(f"{element['oid']}: {element['name']} ({element['type']})")
                 
                 # Háttérszín beállítása status alapján
-                status_colors = {
-                    'NEW': '#dddddd',  # szürke
-                    'EDIT': '#ffffd0',  # halványsárga
-                    'DEL': '#ffd0d0',   # halványpiros
-                    'PUB': '#d0d0ff',   # halványkék
-                    'PRE': '#d0ffd0'    # halványzöld
-                }
-                bg_color = status_colors.get(element['status'], '#ffffff')  # alapértelmezett: fehér
+                bg_color = self.STATUS_COLORS.get(element['status'], '#ffffff')  # alapértelmezett: fehér
                 group_box.setStyleSheet(f"QGroupBox {{ background-color: {bg_color}; }}")
                 
                 group_box_layout = QVBoxLayout(group_box)
@@ -1028,6 +1036,9 @@ class VanDoorMainWindow(QMainWindow):
                 page, title = content.split('#>')
                 label = ClickableLabel(title, content)
                 label.clicked.connect(self.handle_path_click)  # Ugyanazt a handlert használjuk
+                # Háttérszín beállítása status alapján
+                bg_color = self.STATUS_COLORS.get(subpage['status'], '#ffffff')  # alapértelmezett: fehér
+                label.setStyleSheet(f"background-color: {bg_color};")
                 self.subpage_elements_layout.addWidget(label)
 
     def handle_path_click(self, content):
