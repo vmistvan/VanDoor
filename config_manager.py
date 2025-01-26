@@ -143,6 +143,15 @@ class ConfigManager:
                 
         return str(value)
     
+    def change_language(self, language):
+        """
+        Nyelv váltása és fordítások újratöltése
+        
+        :param language: Az új nyelv kódja (pl. 'hu' vagy 'en')
+        """
+        self.set_state('current_language', language)
+        self.load_translations()  # Újratölti a fordításokat az új nyelv szerint
+    
     def save_window_state(self, x: int, y: int, width: int, height: int, is_maximized: bool) -> bool:
         """
         Ablak állapotának mentése

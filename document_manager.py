@@ -371,6 +371,32 @@ class DocumentManager:
         """
         return [elem for elem in self.list_elements if elem['listname'] == listname]
 
+    def escape_page(self, content):
+        """
+        Speciális karakterek escape-elése page elemekhez.
+        A soremelés karaktereket eltávolítja, minden más escape-elés ugyanúgy működik.
+        """
+        if not content:
+            return content
+            
+        # Először eltávolítjuk a soremelés karakterek minden prezentációs módját
+        content = content.replace('\n', ' ').replace('\r', ' ').replace('\\n', ' ').replace('\\r', ' ')
+            
+        # HTML karakterek escape-elése
+        replacements = {
+            '\t': '\\t',    # Tab
+            '<': '&lt;',    # HTML tag kezdete
+            '>': '&gt;',    # HTML tag vége
+            '&': '&amp;',   # HTML és karakter
+            '"': '&quot;',  # Idézőjel
+            "'": '&apos;',  # Aposztróf
+        }
+        
+        result = content
+        for original, escaped in replacements.items():
+            result = result.replace(original, escaped)
+        return result
+
 # Példa használat
 if __name__ == "__main__":
     from models import DocumentElement, DocumentElementType, DocumentElementStatus

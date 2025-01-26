@@ -92,10 +92,10 @@ class SlotType(Enum):
 
 class DocumentElementStatus(Enum):
     NEW = auto()
-    EDITABLE = auto()
-    PREPARED = auto()
+    EDIT = auto()
+    PRE = auto()
     PUBLIC = auto()
-    DELETED = auto()
+    DEL = auto()
 
 class TypeGeometry:
     def __init__(

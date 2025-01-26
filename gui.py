@@ -505,7 +505,7 @@ class AddSubPage(QDialog):
             new_subpage = {
                 'oid': link_oid,
                 'name': f"PAGE{page_oid}",
-                'content': f"{page_oid}#>{new_page_name}",
+                'content': f"{page_oid}#>{self.doc_manager.escape_page(new_page_name)}",
                 'type': "PAGE",
                 'status': "NEW",
                 'pid': self.doc_info['oid'],
@@ -526,7 +526,7 @@ class AddSubPage(QDialog):
                     'elements': [{
                         'oid': page_oid,
                         'name': f"TITLE{page_oid}",
-                        'content': new_page_name,
+                        'content': self.doc_manager.escape_page(new_page_name),
                         'type': "TITLE",
                         'status': "NEW",
                         'pid': self.doc_info['oid'],
@@ -544,7 +544,7 @@ class AddSubPage(QDialog):
                 new_path = {
                     'oid': new_path_oid,
                     'name': f"PATH{page_oid}",
-                    'content': f"{page_oid}#>{new_page_name}",
+                    'content': f"{page_oid}#>{self.doc_manager.escape_page(new_page_name)}",
                     'type': "PATH",
                     'status': "NEW",
                     'pid': self.doc_info['oid'],
@@ -1005,7 +1005,7 @@ class VanDoorMainWindow(QMainWindow):
         """Nyelv váltása"""
         lang_code = 'en' if language == 'English' else 'hu'
         self.translator.change_language(lang_code)
-        self.config_manager.set_state('current_language', lang_code)
+        self.config_manager.change_language(lang_code)  # Ez is frissíti a fordításait
         self.update_ui_texts()
     
     def update_window_title(self, title_content):
