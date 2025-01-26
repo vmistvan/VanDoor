@@ -589,6 +589,7 @@ class ElementContextMenu:
     def create_menu(self, event):
         """Kontextus menü létrehozása"""
         menu = QMenu(self.parent)  # Parent megadása a menünek
+        menu.setStyleSheet("QMenu { menu-scrollable: 1; padding-left: 0px; } QMenu::item { padding-left: 5px; padding-right: 5px;} QMenu::separator { margin-left: 0px; }")
         
         if self.element['status'] == "PUBLIC":
             # Címsor hozzáadása
