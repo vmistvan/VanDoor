@@ -18,7 +18,14 @@
         "undelete": "Undelete",
         "recall": "Recall",
         "back_to_edit": "Back to Edit",
-        "publish": "Publish"
+        "publish": "Publish",
+        "status_titles": {
+            "new": "Newly added",
+            "edit": "Editable status",
+            "public": "Published status",
+            "pre": "Prepared for publish",
+            "del": "Prepared for delete"
+        }
     },
     "element_types": {
         "TITLE": "Title",

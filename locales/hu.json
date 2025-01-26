@@ -18,7 +18,14 @@
         "undelete": "Törlés visszavonása",
         "recall": "Visszahívás",
         "back_to_edit": "Vissza szerkesztésre",
-        "publish": "Publikálás"
+        "publish": "Publikálás",
+        "status_titles": {
+            "new": "Újonnan létrehozott",
+            "edit": "Szerkeszthető állapot",
+            "public": "Publikált állapot",
+            "pre": "Publikálásra előkészítve",
+            "del": "Törlésre előkészítve"
+        }
     },
     "element_types": {
         "TITLE": "Cím",

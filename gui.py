@@ -591,6 +591,11 @@ class ElementContextMenu:
         menu = QMenu(self.parent)  # Parent megadása a menünek
         
         if self.element['status'] == "PUBLIC":
+            # Címsor hozzáadása
+            title_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.status_titles.public'))
+            title_action.setEnabled(False)  # Nem kattintható
+            menu.addSeparator()  # Elválasztó vonal
+            
             # PUBLIC állapotú elem menüpontjai
             recall_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.recall'))
             recall_action.triggered.connect(self.handle_recall)
@@ -599,6 +604,11 @@ class ElementContextMenu:
             delete_action.triggered.connect(self.handle_delete)
             
         elif self.element['status'] == "PRE":
+            # Címsor hozzáadása
+            title_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.status_titles.pre'))
+            title_action.setEnabled(False)  # Nem kattintható
+            menu.addSeparator()  # Elválasztó vonal
+            
             # PRE állapotú elem menüpontjai
             back_to_edit_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.back_to_edit'))
             back_to_edit_action.triggered.connect(self.handle_back_to_edit)
@@ -609,8 +619,29 @@ class ElementContextMenu:
             delete_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.delete'))
             delete_action.triggered.connect(self.handle_delete)
             
-        elif self.element['status'] == "NEW" or self.element['status'] == "EDIT":
-            # Meglévő menüpontok NEW és EDIT állapothoz
+        elif self.element['status'] == "NEW":
+            # Címsor hozzáadása
+            title_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.status_titles.new'))
+            title_action.setEnabled(False)  # Nem kattintható
+            menu.addSeparator()  # Elválasztó vonal
+            
+            # NEW állapotú elem menüpontjai
+            edit_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.edit'))
+            edit_action.triggered.connect(self.handle_edit)
+            
+            pre_publish_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.pre_publish'))
+            pre_publish_action.triggered.connect(self.handle_pre_publish)
+            
+            delete_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.delete'))
+            delete_action.triggered.connect(self.handle_delete)
+            
+        elif self.element['status'] == "EDIT":
+            # Címsor hozzáadása
+            title_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.status_titles.edit'))
+            title_action.setEnabled(False)  # Nem kattintható
+            menu.addSeparator()  # Elválasztó vonal
+            
+            # EDIT állapotú elem menüpontjai
             edit_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.edit'))
             edit_action.triggered.connect(self.handle_edit)
             
@@ -621,7 +652,12 @@ class ElementContextMenu:
             delete_action.triggered.connect(self.handle_delete)
             
         elif self.element['status'] == "DEL":
-            # Meglévő menüpont DEL állapothoz
+            # Címsor hozzáadása
+            title_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.status_titles.del'))
+            title_action.setEnabled(False)  # Nem kattintható
+            menu.addSeparator()  # Elválasztó vonal
+            
+            # DEL állapotú elem menüpontjai
             undelete_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.undelete'))
             undelete_action.triggered.connect(self.handle_undelete)
             
