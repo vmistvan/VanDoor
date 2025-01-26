@@ -15,7 +15,10 @@
         "edit": "Edit",
         "pre_publish": "Pre Publish",
         "delete": "Delete",
-        "undelete": "Undelete"
+        "undelete": "Undelete",
+        "recall": "Recall",
+        "back_to_edit": "Back to Edit",
+        "publish": "Publish"
     },
     "element_types": {
         "TITLE": "Title",

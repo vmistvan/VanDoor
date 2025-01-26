@@ -13,9 +13,12 @@
     "element_content": "Tartalom",
     "context_menu": {
         "edit": "Szerkesztés",
-        "pre_publish": "Publikálás előkésztés",
+        "pre_publish": "Előzetes publikálás",
         "delete": "Törlés",
-        "undelete": "Törlés visszavonása"
+        "undelete": "Törlés visszavonása",
+        "recall": "Visszahívás",
+        "back_to_edit": "Vissza szerkesztésre",
+        "publish": "Publikálás"
     },
     "element_types": {
         "TITLE": "Cím",

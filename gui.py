@@ -468,9 +468,13 @@ class AddSubPage(QDialog):
         # Hozzáad gomb
         self.add_button = QPushButton(self.parent.config_manager.get_translation('add'))
         self.add_button.clicked.connect(self.handle_add)
+        self.add_button.setEnabled(False)  # Kezdetben inaktív
         button_container.addWidget(self.add_button)
         
         layout.addLayout(button_container)
+        
+        # Szövegmező változás figyelése
+        self.name_input.textChanged.connect(self.handle_text_changed)
         
     def handle_cancel(self):
         """Mégse gomb kezelése"""
@@ -567,6 +571,12 @@ class AddSubPage(QDialog):
         except Exception as e:
             print(f"Hiba az új aloldal létrehozása során: {e}")
         
+    def handle_text_changed(self):
+        """Szövegmező változásának kezelése"""
+        # Eltávolítjuk a whitespace karaktereket és ellenőrizzük, hogy maradt-e valami
+        has_content = bool(self.name_input.text().strip())
+        self.add_button.setEnabled(has_content)
+        
 class ElementContextMenu:
     """Elem kontextus menü kezelése"""
     
@@ -578,29 +588,60 @@ class ElementContextMenu:
         
     def create_menu(self, event):
         """Kontextus menü létrehozása"""
-        menu = QMenu(self.parent)
+        menu = QMenu(self.parent)  # Parent megadása a menünek
         
-        status = self.element['status']
-        if status in ['NEW', 'EDIT']:
-            # Edit menüpont
-            edit_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.edit'))
-            edit_action.triggered.connect(self.handle_edit)
+        if self.element['status'] == "PUBLIC":
+            # PUBLIC állapotú elem menüpontjai
+            recall_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.recall'))
+            recall_action.triggered.connect(self.handle_recall)
             
-            # Pre publish menüpont
-            pre_pub_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.pre_publish'))
-            pre_pub_action.triggered.connect(self.handle_pre_publish)
-            
-            # Delete menüpont
             delete_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.delete'))
             delete_action.triggered.connect(self.handle_delete)
             
-        elif status == 'DEL':
-            # Undelete menüpont
+        elif self.element['status'] == "PRE":
+            # PRE állapotú elem menüpontjai
+            back_to_edit_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.back_to_edit'))
+            back_to_edit_action.triggered.connect(self.handle_back_to_edit)
+            
+            publish_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.publish'))
+            publish_action.triggered.connect(self.handle_publish)
+            
+            delete_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.delete'))
+            delete_action.triggered.connect(self.handle_delete)
+            
+        elif self.element['status'] == "NEW" or self.element['status'] == "EDIT":
+            # Meglévő menüpontok NEW és EDIT állapothoz
+            edit_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.edit'))
+            edit_action.triggered.connect(self.handle_edit)
+            
+            pre_publish_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.pre_publish'))
+            pre_publish_action.triggered.connect(self.handle_pre_publish)
+            
+            delete_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.delete'))
+            delete_action.triggered.connect(self.handle_delete)
+            
+        elif self.element['status'] == "DEL":
+            # Meglévő menüpont DEL állapothoz
             undelete_action = menu.addAction(self.parent.config_manager.get_translation('context_menu.undelete'))
             undelete_action.triggered.connect(self.handle_undelete)
+            
+        return menu  # Visszaadjuk a menüt
         
-        return menu
-    
+    def handle_recall(self):
+        """Recall menüpont kezelése"""
+        self.element['status'] = "EDIT"
+        self.save_and_refresh()
+        
+    def handle_back_to_edit(self):
+        """Back to edit menüpont kezelése"""
+        self.element['status'] = "EDIT"
+        self.save_and_refresh()
+        
+    def handle_publish(self):
+        """Publish menüpont kezelése"""
+        self.element['status'] = "PUBLIC"
+        self.save_and_refresh()
+        
     def handle_edit(self):
         """Edit menüpont kezelése"""
         print("Editálás")
