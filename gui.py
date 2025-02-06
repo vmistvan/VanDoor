@@ -336,12 +336,7 @@ class ElementEditorDialog(QDialog):
         
         # Next OID kezelése
         next_oid = config_manager.get_state('next_oid', '1')
-        try:
-            next_oid = str(int(next_oid) + 1)
-            config_manager.set_state('next_oid', next_oid)
-        except ValueError:
-            next_oid = '1'
-            config_manager.set_state('next_oid', next_oid)
+        config_manager.set_state('next_oid', str(int(next_oid) + 1))
         
         # Elem típusának neve (pl. "TEXT", "BOLDTEXT")
         type_name = element_type.type_id
@@ -387,6 +382,15 @@ class ElementEditorDialog(QDialog):
         # Új elem beszúrása
         elements.append(new_element)
         
+        # Path és Subpages elemek pozíciójának növelése
+        if 'path' in self.doc_info:
+            for path_element in self.doc_info['path']:
+                path_element['position'] = str(int(path_element['position']) + 1)
+                
+        if 'subpages' in self.doc_info:
+            for subpage_element in self.doc_info['subpages']:
+                subpage_element['position'] = str(int(subpage_element['position']) + 1)
+        
         # Dokumentum mentése előtt rendezzük a listákat position szerint
         elements.sort(key=lambda x: x.position)
         if 'path' in self.doc_info:
@@ -402,9 +406,7 @@ class ElementEditorDialog(QDialog):
             'path': self.doc_info.get('path', []),
             'subpages': self.doc_info.get('subpages', [])
         })
-        
-        # Next OID növelése és mentése
-        config_manager.set_state('next_oid', str(int(next_oid) + 1))
+                
         
         # Dialog bezárása
         self.accept()
@@ -496,8 +498,7 @@ class AddSubPage(QDialog):
             new_path_oid = str(int(page_oid) + 1)
             
             # next_oid növelése (eredeti + 3)
-            next_oid = str(int(link_oid) + 3)
-            config_manager.set_state('next_oid', next_oid)
+            config_manager.set_state('next_oid', str(int(link_oid) + 3))
             
             # Új oldal neve
             new_page_name = self.name_input.text()

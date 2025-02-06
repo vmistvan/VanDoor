@@ -76,6 +76,11 @@ class ConfigManager:
                 value = value[k]
             else:
                 return default
+                
+        # Ha a next_oid értéke -1, akkor az oid_sequence_starts értékkel térünk vissza
+        if key == 'next_oid' and value == -1:
+            return str(self.get_config('oid_sequence_starts'))
+            
         return value
     
     def set_state(self, key: str, value: Any) -> bool:
