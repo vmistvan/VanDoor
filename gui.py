@@ -387,16 +387,20 @@ class ElementEditorDialog(QDialog):
         # Új elem beszúrása
         elements.append(new_element)
         
-        # Elemek rendezése position szerint
+        # Dokumentum mentése előtt rendezzük a listákat position szerint
         elements.sort(key=lambda x: x.position)
+        if 'path' in self.doc_info:
+            self.doc_info['path'].sort(key=lambda x: int(x['position']))
+        if 'subpages' in self.doc_info:
+            self.doc_info['subpages'].sort(key=lambda x: int(x['position']))
         
         # Dokumentum mentése
         self.doc_manager.write_document({
             'oid': self.doc_info['oid'],
             'name': self.doc_info['name'],
             'elements': elements,
-            'path': self.doc_info.get('path', []),  # Meglévő path elemek megőrzése
-            'subpages': self.doc_info.get('subpages', [])  # Meglévő subpages elemek megőrzése
+            'path': self.doc_info.get('path', []),
+            'subpages': self.doc_info.get('subpages', [])
         })
         
         # Next OID növelése és mentése
@@ -520,6 +524,11 @@ class AddSubPage(QDialog):
             if 'subpages' not in self.doc_info:
                 self.doc_info['subpages'] = []
             self.doc_info['subpages'].append(new_subpage)
+            
+            # Dokumentum mentése előtt rendezzük a listákat position szerint
+            self.doc_info['subpages'].sort(key=lambda x: int(x['position']))
+            if 'path' in self.doc_info:
+                self.doc_info['path'].sort(key=lambda x: int(x['position']))
             
             # Dokumentum mentése
             if self.doc_manager.write_document(self.doc_info):
@@ -712,6 +721,14 @@ class ElementContextMenu:
                     subpage['status'] = self.element['status']
                     break
                     
+        # Dokumentum mentése előtt rendezzük a listákat position szerint
+        if 'elements' in self.parent.doc_info:
+            self.parent.doc_info['elements'].sort(key=lambda x: int(x['position']))
+        if 'path' in self.parent.doc_info:
+            self.parent.doc_info['path'].sort(key=lambda x: int(x['position']))
+        if 'subpages' in self.parent.doc_info:
+            self.parent.doc_info['subpages'].sort(key=lambda x: int(x['position']))
+        
         # Dokumentum mentése
         self.doc_manager.write_document(self.parent.doc_info)
         # Csak az oid-t adjuk át
@@ -1286,6 +1303,13 @@ class VanDoorMainWindow(QMainWindow):
             # Pozíciók cseréje
             current_element.position, previous_element.position = previous_element.position, current_element.position
             
+            # Dokumentum mentése előtt rendezzük a listákat position szerint
+            elements.sort(key=lambda x: x.position)
+            if 'path' in self.doc_info:
+                self.doc_info['path'].sort(key=lambda x: int(x['position']))
+            if 'subpages' in self.doc_info:
+                self.doc_info['subpages'].sort(key=lambda x: int(x['position']))
+            
             # Dokumentum mentése
             self.doc_manager.write_document({
                 'oid': self.doc_info['oid'],
@@ -1362,6 +1386,13 @@ class VanDoorMainWindow(QMainWindow):
         if current_element and next_element:
             # Pozíciók cseréje
             current_element.position, next_element.position = next_element.position, current_element.position
+            
+            # Dokumentum mentése előtt rendezzük a listákat position szerint
+            elements.sort(key=lambda x: x.position)
+            if 'path' in self.doc_info:
+                self.doc_info['path'].sort(key=lambda x: int(x['position']))
+            if 'subpages' in self.doc_info:
+                self.doc_info['subpages'].sort(key=lambda x: int(x['position']))
             
             # Dokumentum mentése
             self.doc_manager.write_document({
