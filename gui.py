@@ -491,30 +491,26 @@ class AddSubPage(QDialog):
     def handle_add(self):
         """Hozzáad gomb kezelése"""
         try:
-            # Következő OID-k lekérése
             config_manager = self.parent.config_manager
+            
+            # 1. Hivatkozás létrehozása
             link_oid = config_manager.get_state('next_oid', '1')
-            page_oid = str(int(link_oid) + 1)
-            new_path_oid = str(int(page_oid) + 1)
+            config_manager.set_state('next_oid', str(int(link_oid) + 1))
             
-            # next_oid növelése (eredeti + 3)
-            config_manager.set_state('next_oid', str(int(link_oid) + 3))
-            
-            # Új oldal neve
-            new_page_name = self.name_input.text()
-            if not new_page_name:
-                return
-                
             # Maximum pozíció meghatározása
             max_path_pos = max([int(p['position']) for p in self.doc_info.get('path', []) if 'position' in p] or [0])
             max_subpages_pos = max([int(p['position']) for p in self.doc_info.get('subpages', []) if 'position' in p] or [0])
             new_position = max(max_path_pos, max_subpages_pos) + 1
             
             # Új subpage elem létrehozása
+            new_page_name = self.name_input.text()
+            if not new_page_name:
+                return
+                
             new_subpage = {
                 'oid': link_oid,
-                'name': f"PAGE{page_oid}",
-                'content': f"{page_oid}#>{self.doc_manager.escape_page(new_page_name)}",
+                'name': f"PAGE{link_oid}",
+                'content': f"{link_oid}#>{self.doc_manager.escape_page(new_page_name)}",
                 'type': "PAGE",
                 'status': "NEW",
                 'pid': self.doc_info['oid'],
@@ -533,7 +529,10 @@ class AddSubPage(QDialog):
             
             # Dokumentum mentése
             if self.doc_manager.write_document(self.doc_info):
-                # Új dokumentum létrehozása
+                # 2. Új dokumentum létrehozása TITLE elemmel
+                page_oid = config_manager.get_state('next_oid', '1')
+                config_manager.set_state('next_oid', str(int(page_oid) + 1))
+                
                 new_doc_info = {
                     'oid': page_oid,
                     'name': f"doc{page_oid}",
@@ -550,11 +549,23 @@ class AddSubPage(QDialog):
                     'path': []
                 }
                 
-                # Path lista másolása és új elem hozzáadása
+                # 3. Path elemek másolása új OID-kkal
+                position_counter = 2  # TITLE után kezdjük
                 if 'path' in self.doc_info:
-                    new_doc_info['path'] = self.doc_info['path'].copy()
+                    for path_elem in self.doc_info['path']:
+                        new_oid = config_manager.get_state('next_oid', '1')
+                        config_manager.set_state('next_oid', str(int(new_oid) + 1))
+                        
+                        new_path_elem = path_elem.copy()
+                        new_path_elem['oid'] = new_oid
+                        new_path_elem['position'] = str(position_counter)
+                        position_counter += 1
+                        new_doc_info['path'].append(new_path_elem)
                 
-                # Új path elem hozzáadása
+                # 4. Új path elem hozzáadása
+                new_path_oid = config_manager.get_state('next_oid', '1')
+                config_manager.set_state('next_oid', str(int(new_path_oid) + 1))
+                
                 new_path = {
                     'oid': new_path_oid,
                     'name': f"PATH{page_oid}",
@@ -562,7 +573,7 @@ class AddSubPage(QDialog):
                     'type': "PATH",
                     'status': "NEW",
                     'pid': self.doc_info['oid'],
-                    'position': str(max_path_pos + 1)
+                    'position': str(position_counter)
                 }
                 new_doc_info['path'].append(new_path)
                 
@@ -579,7 +590,7 @@ class AddSubPage(QDialog):
                 print("Hiba a dokumentum mentése során")
                 
         except Exception as e:
-            print(f"Hiba az új aloldal létrehozása során: {e}")
+            print(f"Hiba: {str(e)}")
         
     def handle_text_changed(self):
         """Szövegmező változásának kezelése"""
