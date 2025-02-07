@@ -510,7 +510,7 @@ class AddSubPage(QDialog):
             new_subpage = {
                 'oid': link_oid,
                 'name': f"PAGE{link_oid}",
-                'content': f"{link_oid}#>{self.doc_manager.escape_page(new_page_name)}",
+                'content': f"{str(int(link_oid) + 1)}#>{self.doc_manager.escape_page(new_page_name)}",
                 'type': "PAGE",
                 'status': "NEW",
                 'pid': self.doc_info['oid'],
