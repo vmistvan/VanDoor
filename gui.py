@@ -1267,12 +1267,10 @@ class VanDoorMainWindow(QMainWindow):
         # Elemek listájának konvertálása DocumentElement objektumokká
         elements = []
         for element_dict in self.doc_info['elements']:
-            # Elem típusának lekérése
             element_type = DocumentElementType.get(element_dict['type'])
             if not element_type:
                 continue
                 
-            # Elem létrehozása
             element = DocumentElement(
                 name=element_dict['name'],
                 content=element_dict['content'],
@@ -1282,25 +1280,7 @@ class VanDoorMainWindow(QMainWindow):
                 position=int(element_dict['position'])
             )
             element.oid = element_dict['oid']
-            
-            # Ha az elem pozíciója nagyobb vagy egyenlő az új elem pozíciójával,
-            # növeljük eggyel
-            if element.position >= current_pos:
-                element.position += 1
-                
             elements.append(element)
-            
-        # PATH típusú elemek pozícióinak növelése
-        if 'path' in self.doc_info:
-            for path_element in self.doc_info['path']:
-                if int(path_element['position']) >= current_pos:
-                    path_element['position'] = str(int(path_element['position']) + 1)
-                    
-        # PAGE típusú elemek pozícióinak növelése
-        if 'subpages' in self.doc_info:
-            for page_element in self.doc_info['subpages']:
-                if int(page_element['position']) >= current_pos:
-                    page_element['position'] = str(int(page_element['position']) + 1)
                     
         # A mozgatandó elem és az előtte lévő elem megkeresése
         current_element = None
@@ -1351,12 +1331,10 @@ class VanDoorMainWindow(QMainWindow):
         # Elemek listájának konvertálása DocumentElement objektumokká
         elements = []
         for element_dict in self.doc_info['elements']:
-            # Elem típusának lekérése
             element_type = DocumentElementType.get(element_dict['type'])
             if not element_type:
                 continue
                 
-            # Elem létrehozása
             element = DocumentElement(
                 name=element_dict['name'],
                 content=element_dict['content'],
@@ -1366,25 +1344,12 @@ class VanDoorMainWindow(QMainWindow):
                 position=int(element_dict['position'])
             )
             element.oid = element_dict['oid']
-            
-            # Ha az elem pozíciója nagyobb vagy egyenlő az új elem pozíciójával,
-            # növeljük eggyel
-            if element.position > current_pos:
-                element.position += 1
-                
             elements.append(element)
             
-        # PATH típusú elemek pozícióinak növelése
-        if 'path' in self.doc_info:
-            for path_element in self.doc_info['path']:
-                if int(path_element['position']) > current_pos:
-                    path_element['position'] = str(int(path_element['position']) + 1)
-                    
-        # PAGE típusú elemek pozícióinak növelése
-        if 'subpages' in self.doc_info:
-            for page_element in self.doc_info['subpages']:
-                if int(page_element['position']) > current_pos:
-                    page_element['position'] = str(int(page_element['position']) + 1)
+        # Ellenőrizzük, hogy nem az utolsó elem-e
+        max_position = max(element.position for element in elements)
+        if current_pos >= max_position:
+            return
                     
         # A mozgatandó elem és az utána következő elem megkeresése
         current_element = None
